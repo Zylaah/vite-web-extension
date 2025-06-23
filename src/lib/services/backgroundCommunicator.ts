@@ -2,7 +2,7 @@
  * Background communication service for Hana extension
  */
 import browser from 'webextension-polyfill';
-import type { BackgroundMessage, PrivacyStatus } from '../types';
+import type { BackgroundMessage, PrivacyStatus, AIResponse, AIProvider, ModelQuality } from '../types';
 
 /**
  * Service for communicating with the background script
@@ -65,6 +65,78 @@ export const BackgroundCommunicator = {
     } catch (error) {
       console.error('Error getting shortcut:', error);
       return { name: 'toggle-input', shortcut: 'Alt+F' };
+    }
+  },
+  
+  /**
+   * Queries the AI with a prompt
+   * @param options - The query options
+   * @returns Promise with the AI response
+   */
+  async queryAI(options: {
+    prompt: string;
+    provider: string | AIProvider;
+    model: string | ModelQuality;
+    pageContent: string;
+    streaming?: boolean;
+  }): Promise<AIResponse> {
+    try {
+      return await this.sendMessage<AIResponse>({
+        action: 'query-ai',
+        prompt: options.prompt,
+        provider: options.provider,
+        model: options.model,
+        pageContent: options.pageContent,
+        streaming: options.streaming || false
+      });
+    } catch (error) {
+      console.error('Error querying AI:', error);
+      return { 
+        error: true, 
+        text: error instanceof Error ? error.message : 'An error occurred while querying the AI'
+      };
+    }
+  },
+  
+  /**
+   * Starts a streaming query to the AI
+   * @param options - The query options
+   * @returns Promise with acknowledgment (streaming chunks will be sent via tabs.sendMessage)
+   */
+  async queryAIStreaming(options: {
+    prompt: string;
+    provider: string | AIProvider;
+    model: string | ModelQuality;
+    pageContent: string;
+  }): Promise<{ received: boolean }> {
+    try {
+      return await this.sendMessage<{ received: boolean }>({
+        action: 'query-ai-streaming',
+        prompt: options.prompt,
+        provider: options.provider,
+        model: options.model,
+        pageContent: options.pageContent
+      });
+    } catch (error) {
+      console.error('Error starting streaming query:', error);
+      return { received: false };
+    }
+  },
+  
+  /**
+   * Analyzes the importance of text segments
+   * @param text - The text to analyze
+   * @returns Promise with acknowledgment (results will be sent via tabs.sendMessage)
+   */
+  async analyzeImportance(text: string): Promise<{ received: boolean }> {
+    try {
+      return await this.sendMessage<{ received: boolean }>({
+        action: 'analyze-importance',
+        text
+      });
+    } catch (error) {
+      console.error('Error analyzing text importance:', error);
+      return { received: false };
     }
   }
 }; 
