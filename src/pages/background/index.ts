@@ -4,7 +4,7 @@
 import browser from 'webextension-polyfill';
 import { PrivacyManager } from '../../lib/services/privacyManager';
 import { RateLimiter } from '../../lib/utils/rateLimiter';
-import { CryptoUtils } from '../../lib/utils/crypto';
+
 import { getModelName } from '../../lib/config/models';
 import { getApiClient } from '../../lib/api/apiFactory';
 import { ImportanceAnalyzer } from '../../lib/services/importanceAnalyzer';
@@ -26,6 +26,11 @@ browser.runtime.onInstalled.addListener(async (details) => {
  * Main message listener
  */
 browser.runtime.onMessage.addListener((message: any, sender, sendResponse) => {
+  // Debug: Log all received messages
+  console.log('🔍 Hana Background: Received message with action:', message.action, 'type:', message.type, 'at', Date.now());
+  console.log('🔍 Hana Background: Full message:', message);
+  console.log('🔍 Hana Background: Sender tab ID:', sender.tab?.id);
+  
   // Wrap in async IIFE to use await
   (async () => {
     const messageType = message.action || message.type;
@@ -116,18 +121,23 @@ browser.runtime.onMessage.addListener((message: any, sender, sendResponse) => {
           return;
         }
         
+        console.log('🚀 Hana Background: Starting streaming query at', Date.now());
+        const streamingStartTime = Date.now();
+        
         try {
           // Acknowledge receipt immediately
+          console.log('📡 Hana Background: Sending acknowledgment at', Date.now() - streamingStartTime, 'ms');
           sendResponse({ received: true });
           
           // Get the appropriate API client
+          console.log('🔧 Hana Background: Getting API client at', Date.now() - streamingStartTime, 'ms');
           const apiClient = getApiClient(message.provider);
           
           // Check if client supports streaming
           if ('callStreaming' in apiClient) {
             const model = getModelName(message.provider, message.model);
             const isSummary = message.prompt.toLowerCase().includes('summarize');
-            console.log(`Starting streaming call to ${message.provider} API with model ${model}`);
+            console.log(`🤖 Hana Background: Starting streaming call to ${message.provider} API with model ${model} at ${Date.now() - streamingStartTime}ms`);
             
             // Start streaming
             await (apiClient as any).callStreaming(
@@ -144,12 +154,15 @@ browser.runtime.onMessage.addListener((message: any, sender, sendResponse) => {
               }
             );
             
+            console.log('✅ Hana Background: Streaming completed at', Date.now() - streamingStartTime, 'ms');
+            
             // Send completion message
             browser.tabs.sendMessage(sender.tab?.id || 0, {
               action: 'streaming-complete'
             });
           } else {
             // Fallback to regular call
+            console.log('⚠️ Hana Background: Using fallback non-streaming call');
             const model = getModelName(message.provider, message.model);
             const isSummary = message.prompt.toLowerCase().includes('summarize');
             const response = await apiClient.call(message.prompt, message.pageContent, model, isSummary);
@@ -160,7 +173,7 @@ browser.runtime.onMessage.addListener((message: any, sender, sendResponse) => {
             });
           }
         } catch (error: any) {
-          console.error('Error in streaming call:', error);
+          console.error('❌ Hana Background: Error in streaming call at', Date.now() - streamingStartTime, 'ms:', error);
           browser.tabs.sendMessage(sender.tab?.id || 0, {
             action: 'streaming-error',
             error: error.message || 'An error occurred during streaming'
@@ -202,33 +215,7 @@ browser.runtime.onMessage.addListener((message: any, sender, sendResponse) => {
         }
         break;
 
-      case 'encrypt-api-key':
-        if (!message.apiKey) {
-          sendResponse({ error: 'No API key provided' });
-        } else {
-          try {
-            const encryptedKey = await CryptoUtils.encryptApiKey(message.apiKey);
-            sendResponse({ encryptedKey });
-                     } catch(error: any) {
-             console.error('Error encrypting API key:', error);
-             sendResponse({ error: true, message: error.message });
-           }
-        }
-        break;
 
-      case 'decrypt-api-key':
-        if (!message.encryptedKey) {
-          sendResponse({ error: 'No encrypted key provided' });
-        } else {
-          try {
-            const decryptedKey = await CryptoUtils.decryptApiKey(message.encryptedKey);
-            sendResponse({ decryptedKey });
-                     } catch (error: any) {
-             console.error('Error decrypting API key:', error);
-             sendResponse({ error: true, message: error.message });
-           }
-        }
-        break;
         
       case 'analyze-importance':
         if (!message.text) {
@@ -248,7 +235,7 @@ browser.runtime.onMessage.addListener((message: any, sender, sendResponse) => {
         }
           
         // Check rate limit
-        if (RateLimiter.check(3, 60 * 1000)) { // Stricter rate limit for analysis
+        if (RateLimiter.check(20, 60 * 1000)) { // More reasonable rate limit for analysis (was 3)
           console.log('Rate limit reached for importance analysis');
           sendResponse({ 
             error: true, 

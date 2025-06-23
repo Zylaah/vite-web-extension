@@ -2,119 +2,132 @@
  * Storage service for Hana extension
  */
 import browser from 'webextension-polyfill';
-import type { UserSettings, AIProvider, ModelQuality } from '../types';
+import type { AIProvider } from '../types';
 
-// Default settings
-const DEFAULT_SETTINGS: UserSettings = {
-  selectedProvider: 'mistral',
-  qualityPreference: 'accurate',
-  darkMode: false,
-  highlightImportant: true
-};
+/**
+ * Interface for settings data
+ */
+export interface SettingsData {
+  selectedProvider: AIProvider;
+  qualityPreference: string;
+  mistralApiKey?: string;
+  openaiApiKey?: string;
+  anthropicApiKey?: string;
+  deepseekApiKey?: string;
+}
 
 /**
  * Service for managing extension storage
  */
 export const StorageService = {
   /**
-   * Gets all user settings
-   * @returns Promise with the user settings
+   * Gets all settings from storage
+   * @returns Promise with settings data
    */
-  async getSettings(): Promise<UserSettings> {
+  async getSettings(): Promise<SettingsData> {
     try {
-      const data = await browser.storage.local.get(null);
-      return { ...DEFAULT_SETTINGS, ...data };
+      const result = await browser.storage.local.get([
+        'selectedProvider',
+        'qualityPreference',
+        'mistralApiKey',
+        'openaiApiKey',
+        'anthropicApiKey',
+        'deepseekApiKey'
+      ]) as any;
+      
+      return {
+        selectedProvider: result.selectedProvider || 'mistral',
+        qualityPreference: result.qualityPreference || 'balanced',
+        mistralApiKey: result.mistralApiKey || '',
+        openaiApiKey: result.openaiApiKey || '',
+        anthropicApiKey: result.anthropicApiKey || '',
+        deepseekApiKey: result.deepseekApiKey || ''
+      };
     } catch (error) {
       console.error('Error getting settings:', error);
-      return DEFAULT_SETTINGS;
+      return {
+        selectedProvider: 'mistral' as AIProvider,
+        qualityPreference: 'balanced',
+        mistralApiKey: '',
+        openaiApiKey: '',
+        anthropicApiKey: '',
+        deepseekApiKey: ''
+      };
     }
   },
 
   /**
-   * Updates user settings
-   * @param settings - Partial settings to update
-   * @returns Promise that resolves when settings are saved
+   * Saves settings to storage
+   * @param settings - Settings to save
+   * @returns Promise
    */
-  async updateSettings(settings: Partial<UserSettings>): Promise<void> {
+  async saveSettings(settings: Partial<SettingsData>): Promise<void> {
     try {
-      await browser.storage.local.set(settings);
+      // Trim API keys before saving
+      const trimmedSettings = { ...settings };
+      if (trimmedSettings.mistralApiKey) {
+        trimmedSettings.mistralApiKey = trimmedSettings.mistralApiKey.trim();
+      }
+      if (trimmedSettings.openaiApiKey) {
+        trimmedSettings.openaiApiKey = trimmedSettings.openaiApiKey.trim();
+      }
+      if (trimmedSettings.anthropicApiKey) {
+        trimmedSettings.anthropicApiKey = trimmedSettings.anthropicApiKey.trim();
+      }
+      if (trimmedSettings.deepseekApiKey) {
+        trimmedSettings.deepseekApiKey = trimmedSettings.deepseekApiKey.trim();
+      }
+      
+      await browser.storage.local.set(trimmedSettings);
     } catch (error) {
-      console.error('Error updating settings:', error);
+      console.error('Error saving settings:', error);
       throw error;
     }
   },
 
   /**
-   * Gets the API key for a specific provider
+   * Gets the API key for a specific provider (plain text)
    * @param provider - The AI provider
-   * @returns Promise with the API key or undefined
+   * @returns Promise with the API key
    */
-  async getApiKey(provider: AIProvider): Promise<string | undefined> {
+  async getApiKey(provider: AIProvider): Promise<string> {
     try {
       const keyName = `${provider}ApiKey`;
-      const data = await browser.storage.local.get(keyName);
-      return data[keyName] as string | undefined;
+      const result = await browser.storage.local.get(keyName) as any;
+      return result[keyName] || '';
     } catch (error) {
       console.error(`Error getting API key for ${provider}:`, error);
-      return undefined;
+      return '';
     }
   },
 
   /**
-   * Sets the API key for a specific provider
+   * Saves an API key for a specific provider (plain text)
    * @param provider - The AI provider
    * @param apiKey - The API key to save
-   * @returns Promise that resolves when the API key is saved
+   * @returns Promise
    */
-  async setApiKey(provider: AIProvider, apiKey: string): Promise<void> {
+  async saveApiKey(provider: AIProvider, apiKey: string): Promise<void> {
     try {
       const keyName = `${provider}ApiKey`;
-      await browser.storage.local.set({ [keyName]: apiKey });
+      const trimmedKey = apiKey.trim();
+      await browser.storage.local.set({ [keyName]: trimmedKey });
     } catch (error) {
-      console.error(`Error setting API key for ${provider}:`, error);
+      console.error(`Error saving API key for ${provider}:`, error);
       throw error;
     }
   },
 
   /**
-   * Gets the selected AI provider
-   * @returns Promise with the selected provider
+   * Clears all storage
+   * @returns Promise
    */
-  async getSelectedProvider(): Promise<AIProvider> {
+  async clearAll(): Promise<void> {
     try {
-      const data = await browser.storage.local.get('selectedProvider');
-      return (data.selectedProvider as AIProvider) || DEFAULT_SETTINGS.selectedProvider;
+      await browser.storage.local.clear();
     } catch (error) {
-      console.error('Error getting selected provider:', error);
-      return DEFAULT_SETTINGS.selectedProvider;
-    }
-  },
-
-  /**
-   * Gets the quality preference
-   * @returns Promise with the quality preference
-   */
-  async getQualityPreference(): Promise<ModelQuality> {
-    try {
-      const data = await browser.storage.local.get('qualityPreference');
-      return (data.qualityPreference as ModelQuality) || DEFAULT_SETTINGS.qualityPreference;
-    } catch (error) {
-      console.error('Error getting quality preference:', error);
-      return DEFAULT_SETTINGS.qualityPreference;
-    }
-  },
-
-  /**
-   * Gets the dark mode preference
-   * @returns Promise with the dark mode preference
-   */
-  async getDarkMode(): Promise<boolean> {
-    try {
-      const data = await browser.storage.local.get('darkMode');
-      return typeof data.darkMode === 'boolean' ? data.darkMode : DEFAULT_SETTINGS.darkMode;
-    } catch (error) {
-      console.error('Error getting dark mode preference:', error);
-      return DEFAULT_SETTINGS.darkMode;
+      console.error('Error clearing storage:', error);
+      throw error;
     }
   }
 }; 

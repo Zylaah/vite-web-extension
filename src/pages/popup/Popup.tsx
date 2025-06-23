@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import browser from 'webextension-polyfill';
-import { StorageService } from '../../lib/services/storageService';
-import type { AIProvider, UserSettings } from '../../lib/types';
+import { StorageService, type SettingsData } from '../../lib/services/storageService';
+import type { AIProvider } from '../../lib/types';
 
 const Popup: React.FC = () => {
-  const [settings, setSettings] = useState<UserSettings>({
+  const [settings, setSettings] = useState<SettingsData>({
     selectedProvider: 'mistral',
-    qualityPreference: 'accurate',
-    darkMode: false,
-    highlightImportant: true
+    qualityPreference: 'balanced',
+    mistralApiKey: '',
+    openaiApiKey: '',
+    anthropicApiKey: '',
+    deepseekApiKey: ''
   });
   
   // Detect system dark mode for UI styling only
@@ -50,7 +52,7 @@ const Popup: React.FC = () => {
     setSettings(prev => ({ ...prev, selectedProvider: newProvider }));
     
     try {
-      await StorageService.updateSettings({ selectedProvider: newProvider });
+      await StorageService.saveSettings({ selectedProvider: newProvider });
       setMessage('Provider updated');
     } catch (error) {
       console.error('Error updating provider:', error);
@@ -60,31 +62,15 @@ const Popup: React.FC = () => {
   
   // Handle quality preference change
   const handleQualityChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newQuality = e.target.value as 'fast' | 'accurate';
+    const newQuality = e.target.value;
     setSettings(prev => ({ ...prev, qualityPreference: newQuality }));
     
     try {
-      await StorageService.updateSettings({ qualityPreference: newQuality });
+      await StorageService.saveSettings({ qualityPreference: newQuality });
       setMessage('Quality preference updated');
     } catch (error) {
       console.error('Error updating quality preference:', error);
       setMessage('Error updating quality preference');
-    }
-  };
-  
-
-  
-  // Handle highlight toggle
-  const handleHighlightToggle = async () => {
-    const newHighlight = !settings.highlightImportant;
-    setSettings(prev => ({ ...prev, highlightImportant: newHighlight }));
-    
-    try {
-      await StorageService.updateSettings({ highlightImportant: newHighlight });
-      setMessage(`Highlighting ${newHighlight ? 'enabled' : 'disabled'}`);
-    } catch (error) {
-      console.error('Error updating highlight setting:', error);
-      setMessage('Error updating highlight setting');
     }
   };
   
@@ -130,21 +116,13 @@ const Popup: React.FC = () => {
           onChange={handleQualityChange}
           className={`w-full p-2 rounded border ${systemDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
         >
-          <option value="fast">Fast (smaller model)</option>
-          <option value="accurate">Accurate (larger model)</option>
+          <option value="balanced">Balanced</option>
+          <option value="fast">Fast</option>
+          <option value="accurate">Accurate</option>
         </select>
       </div>
       
-      <div className="mb-4 flex items-center">
-        <input 
-          type="checkbox" 
-          id="highlight" 
-          checked={settings.highlightImportant}
-          onChange={handleHighlightToggle}
-          className="mr-2"
-        />
-        <label htmlFor="highlight" className="text-sm">Highlight important information</label>
-      </div>
+
       
       <div className="border-t pt-4 mt-4 flex justify-between">
         <button 

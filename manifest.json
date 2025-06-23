@@ -3,6 +3,11 @@
   "name": "Hana",
   "version": "2.7.0",
   "description": "AI-powered page summarizer and question answering tool with multiple provider support",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "hana-extension@example.com"
+    }
+  },
   "options_ui": {
     "page": "src/pages/options/index.html",
     "open_in_tab": true
@@ -62,7 +67,9 @@
         "icons/AI_48x48.png",
         "icons/AI_128x128.png",
         "src/pages/popup/index.html",
-        "src/pages/options/index.html"
+        "src/pages/options/index.html",
+        "assets/*.js",
+        "assets/*.css"
       ],
       "matches": ["<all_urls>"]
     }

@@ -17,14 +17,10 @@ export const ImportanceAnalyzer = {
    */
   async analyze(text: string): Promise<ImportantTextPart[]> {
     try {
-      // Check if highlighting is enabled
-      const settings = await StorageService.getSettings();
-      if (settings.highlightImportant === false) {
-        console.log('Importance analysis skipped: highlighting disabled in settings');
-        return [];
-      }
+      // Highlighting is always enabled in simplified version
       
       // Get the selected provider
+      const settings = await StorageService.getSettings();
       const provider = settings.selectedProvider;
       
       // Get the API client

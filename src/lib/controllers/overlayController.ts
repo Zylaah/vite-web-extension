@@ -8,6 +8,10 @@ import { IframeInjector, IframeInstance } from '../utils/iframeInjector';
 import { TabConversationManager } from '../utils/tabConversationManager';
 import { MessageBus } from '../utils/messageHandler';
 import { attachToggleKeybind } from '../services/keybindManager';
+import { createRoot } from 'react-dom/client';
+import * as React from 'react';
+import Overlay from '../../pages/content/components/Overlay';
+import overlayStyles from '../../pages/content/overlay.css?inline';
 
 export class OverlayController {
   private overlayInstance: IframeInstance | null = null;
@@ -210,8 +214,8 @@ export class OverlayController {
     // Apply dark mode based on user settings
     const applyDarkMode = async () => {
       try {
-        const settings = await StorageService.getSettings();
-        if (settings.darkMode) {
+        // Use system dark mode preference
+        if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
           shadowRoot.host.classList.add('dark-mode');
         } else {
           shadowRoot.host.classList.remove('dark-mode');
@@ -241,15 +245,11 @@ export class OverlayController {
     shadowRoot.appendChild(appContainer);
     
     // Inject overlay styles into shadow DOM
-    const overlayStyles = await import('../../pages/content/overlay.css?inline');
     const styleElement = document.createElement('style');
-    styleElement.textContent = overlayStyles.default;
+    styleElement.textContent = overlayStyles;
     shadowRoot.appendChild(styleElement);
     
     // Create and mount React component
-    const { createRoot } = await import('react-dom/client');
-    const React = await import('react');
-    const { default: Overlay } = await import('../../pages/content/components/Overlay');
     
     const root = createRoot(appContainer);
     

@@ -337,6 +337,9 @@ const Overlay: React.FC<OverlayProps> = ({
   };
 
   const handleRequest = async (prompt: string) => {
+    console.log('🚀 Hana: Starting handleRequest at', Date.now());
+    const startTime = Date.now();
+    
     if (!responseRef.current) {
       return;
     }
@@ -365,16 +368,23 @@ const Overlay: React.FC<OverlayProps> = ({
       const chatContext = getChatContext();
       let finalPrompt = chatContext ? `${chatContext}${prompt}` : prompt;
       
+      console.log('⏱️ Hana: About to get content at', Date.now() - startTime, 'ms');
+      
       // Get current page content with caching optimization
       let currentPageContent: string;
       
       if (mode === 'summary') {
         // For summaries, prefer cached content for speed and use optimized prompt
         if (getContentForSummary) {
+          console.log('📄 Hana: Getting content for summary...');
           currentPageContent = await getContentForSummary();
+          console.log('✅ Hana: Got content for summary at', Date.now() - startTime, 'ms, length:', currentPageContent.length);
         } else if (getPageContent) {
+          console.log('📄 Hana: Fallback to sync getPageContent...');
           currentPageContent = getPageContent();
+          console.log('✅ Hana: Got sync content at', Date.now() - startTime, 'ms, length:', currentPageContent.length);
         } else {
+          console.log('📄 Hana: Using provided pageContent...');
           currentPageContent = pageContent;
         }
         
@@ -385,13 +395,20 @@ const Overlay: React.FC<OverlayProps> = ({
       } else {
         // For chat, use regular content getter which may use cache or fresh content
         if (getCurrentContent) {
+          console.log('📄 Hana: Getting current content...');
           currentPageContent = await getCurrentContent();
+          console.log('✅ Hana: Got current content at', Date.now() - startTime, 'ms, length:', currentPageContent.length);
         } else if (getPageContent) {
+          console.log('📄 Hana: Fallback to sync getPageContent...');
           currentPageContent = getPageContent();
+          console.log('✅ Hana: Got sync content at', Date.now() - startTime, 'ms, length:', currentPageContent.length);
         } else {
+          console.log('📄 Hana: Using provided pageContent...');
           currentPageContent = pageContent;
         }
       }
+      
+      console.log('🔌 Hana: About to call API at', Date.now() - startTime, 'ms');
       
       const result = await BackgroundCommunicator.queryAIStreaming({
         prompt: finalPrompt,
@@ -400,12 +417,15 @@ const Overlay: React.FC<OverlayProps> = ({
         pageContent: currentPageContent
       });
       
+      console.log('📡 Hana: API call returned at', Date.now() - startTime, 'ms, received:', result.received);
+      
       if (!result.received) {
         setError('Failed to start streaming request');
         setIsLoading(false);
         setIsStreaming(false);
       }
     } catch (e: any) {
+      console.error('❌ Hana: Error at', Date.now() - startTime, 'ms:', e);
       setError(e.message || 'An error occurred while processing your request');
       setIsLoading(false);
       setIsStreaming(false);

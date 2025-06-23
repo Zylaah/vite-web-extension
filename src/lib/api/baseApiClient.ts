@@ -21,10 +21,15 @@ export abstract class BaseApiClient {
    * @throws Error if API key is not found
    */
   protected async getApiKey(): Promise<string> {
+    console.log(`🔑 BaseApiClient: Getting API key for ${this.provider}`);
+    const startTime = Date.now();
+    
     const apiKey = await StorageService.getApiKey(this.provider);
     if (!apiKey) {
       throw new Error(`API key for ${this.provider} not found. Please add your API key in the options page.`);
     }
+    
+    console.log(`✅ BaseApiClient: API key retrieved in ${Date.now() - startTime}ms total`);
     return apiKey;
   }
   

@@ -4,22 +4,20 @@ import './Options.css';
 import { StorageService } from '../../lib/services/storageService';
 import { BackgroundCommunicator } from '../../lib/services/backgroundCommunicator';
 import { PrivacyManager } from '../../lib/services/privacyManager';
-import type { UserSettings, AIProvider, ModelQuality } from '../../lib/types';
+import type { AIProvider } from '../../lib/types';
+import type { SettingsData } from '../../lib/services/storageService';
 
 const Options: React.FC = () => {
-  const [settings, setSettings] = useState<UserSettings>({
+  const [settings, setSettings] = useState<SettingsData>({
     selectedProvider: 'mistral',
-    qualityPreference: 'accurate',
-    darkMode: false,
-    highlightImportant: true
+    qualityPreference: 'balanced',
+    mistralApiKey: '',
+    openaiApiKey: '',
+    anthropicApiKey: '',
+    deepseekApiKey: ''
   });
   
-  const [apiKeys, setApiKeys] = useState({
-    mistral: '',
-    openai: '',
-    anthropic: '',
-    deepseek: ''
-  });
+  const [darkMode, setDarkMode] = useState(false);
   
   const [activeTab, setActiveTab] = useState<'providers' | 'settings' | 'info'>('providers');
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
@@ -31,22 +29,9 @@ const Options: React.FC = () => {
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        // Load settings
+        // Load settings (includes API keys now)
         const storedSettings = await StorageService.getSettings();
         setSettings(storedSettings);
-        
-        // Load API keys
-        const mistralKey = await StorageService.getApiKey('mistral');
-        const openaiKey = await StorageService.getApiKey('openai');
-        const anthropicKey = await StorageService.getApiKey('anthropic');
-        const deepseekKey = await StorageService.getApiKey('deepseek');
-        
-        setApiKeys({
-          mistral: mistralKey || '',
-          openai: openaiKey || '',
-          anthropic: anthropicKey || '',
-          deepseek: deepseekKey || ''
-        });
         
         // Check privacy status
         const privacyStatus = await PrivacyManager.getStatus();
@@ -61,41 +46,32 @@ const Options: React.FC = () => {
 
   // Apply dark mode to body
   useEffect(() => {
-    if (settings.darkMode) {
+    if (darkMode) {
       document.body.classList.add('dark-mode');
     } else {
       document.body.classList.remove('dark-mode');
     }
-  }, [settings.darkMode]);
+  }, [darkMode]);
   
   // Handle settings changes
   const handleProviderChange = (provider: AIProvider) => {
     setSettings(prev => ({ ...prev, selectedProvider: provider }));
   };
   
-  const handleQualityChange = (quality: ModelQuality) => {
+  const handleQualityChange = (quality: string) => {
     setSettings(prev => ({ ...prev, qualityPreference: quality }));
   };
   
-  const handleDarkModeChange = async (darkMode: boolean) => {
-    setSettings(prev => ({ ...prev, darkMode }));
-    
-    // Immediately save dark mode setting to storage
-    try {
-      await StorageService.updateSettings({ darkMode });
-      console.log('Dark mode setting saved:', darkMode);
-    } catch (error) {
-      console.error('Failed to save dark mode setting:', error);
-    }
+  const handleDarkModeChange = async (newDarkMode: boolean) => {
+    setDarkMode(newDarkMode);
   };
   
-  const handleHighlightChange = (highlightImportant: boolean) => {
-    setSettings(prev => ({ ...prev, highlightImportant }));
-  };
+
   
   // Handle API key changes
   const handleApiKeyChange = (provider: AIProvider, value: string) => {
-    setApiKeys(prev => ({ ...prev, [provider]: value }));
+    const keyName = `${provider}ApiKey` as keyof SettingsData;
+    setSettings(prev => ({ ...prev, [keyName]: value }));
   };
   
   // Handle privacy policy acceptance
@@ -114,25 +90,8 @@ const Options: React.FC = () => {
     setSaveMessage('');
     
     try {
-      // Save settings
-      await StorageService.updateSettings(settings);
-      
-      // Save API keys
-      if (apiKeys.mistral) {
-        await StorageService.setApiKey('mistral', apiKeys.mistral);
-      }
-      
-      if (apiKeys.openai) {
-        await StorageService.setApiKey('openai', apiKeys.openai);
-      }
-      
-      if (apiKeys.anthropic) {
-        await StorageService.setApiKey('anthropic', apiKeys.anthropic);
-      }
-      
-      if (apiKeys.deepseek) {
-        await StorageService.setApiKey('deepseek', apiKeys.deepseek);
-      }
+      // Save all settings including API keys
+      await StorageService.saveSettings(settings);
       
       setSaveMessage('Settings saved successfully!');
       setTimeout(() => setSaveMessage(''), 3000);
@@ -162,24 +121,24 @@ const Options: React.FC = () => {
         color: 'var(--text-color)',
         transition: 'background-color 0.3s, color 0.3s',
         minHeight: '100vh',
-        '--bg-color': settings.darkMode ? '#1a1a1a' : '#f5f5f7',
-        '--text-color': settings.darkMode ? '#f5f5f7' : '#1d1d1f',
-        '--secondary-text': settings.darkMode ? '#a1a1a6' : '#6e6e73',
-        '--container-bg': settings.darkMode ? '#2d2d2d' : '#ffffff',
-        '--border-color': settings.darkMode ? '#424242' : '#d2d2d7',
-        '--button-primary': settings.darkMode ? '#aa69c4' : '#e44b79',
-        '--button-primary-hover': settings.darkMode ? '#9e4dbe' : 'rgb(235, 103, 143)',
-        '--button-secondary': settings.darkMode ? '#42c268' : '#34a853',
-        '--button-secondary-hover': settings.darkMode ? '#35a855' : '#2d9249',
+        '--bg-color': darkMode ? '#1a1a1a' : '#f5f5f7',
+        '--text-color': darkMode ? '#f5f5f7' : '#1d1d1f',
+        '--secondary-text': darkMode ? '#a1a1a6' : '#6e6e73',
+        '--container-bg': darkMode ? '#2d2d2d' : '#ffffff',
+        '--border-color': darkMode ? '#424242' : '#d2d2d7',
+        '--button-primary': darkMode ? '#aa69c4' : '#e44b79',
+        '--button-primary-hover': darkMode ? '#9e4dbe' : 'rgb(235, 103, 143)',
+        '--button-secondary': darkMode ? '#42c268' : '#34a853',
+        '--button-secondary-hover': darkMode ? '#35a855' : '#2d9249',
         '--button-text': 'white',
-        '--success-color': settings.darkMode ? '#30d158' : '#137333',
-        '--success-bg': settings.darkMode ? '#0e5624' : '#e6f4ea',
-        '--error-color': settings.darkMode ? '#ff453a' : '#d93025',
-        '--error-bg': settings.darkMode ? '#551111' : '#fce8e6',
-        '--card-shadow': settings.darkMode 
+        '--success-color': darkMode ? '#30d158' : '#137333',
+        '--success-bg': darkMode ? '#0e5624' : '#e6f4ea',
+        '--error-color': darkMode ? '#ff453a' : '#d93025',
+        '--error-bg': darkMode ? '#551111' : '#fce8e6',
+        '--card-shadow': darkMode 
           ? '0 4px 20px rgba(0, 0, 0, 0.3)' 
           : '0 4px 20px rgba(0, 0, 0, 0.08)',
-        '--hover-shadow': settings.darkMode 
+        '--hover-shadow': darkMode 
           ? '0 8px 30px rgba(0, 0, 0, 0.4)' 
           : '0 8px 30px rgba(0, 0, 0, 0.12)'
       } as React.CSSProperties}
@@ -269,11 +228,11 @@ const Options: React.FC = () => {
           </p>
 
           <div style={{
-            backgroundColor: settings.darkMode ? 'rgba(170, 105, 196, 0.1)' : 'rgba(228, 75, 121, 0.1)',
+            backgroundColor: darkMode ? 'rgba(170, 105, 196, 0.1)' : 'rgba(228, 75, 121, 0.1)',
             borderRadius: '16px',
             padding: '24px',
             margin: '0 0 32px 0',
-            border: `1px solid ${settings.darkMode ? 'rgba(170, 105, 196, 0.3)' : 'rgba(228, 75, 121, 0.3)'}`
+            border: `1px solid ${darkMode ? 'rgba(170, 105, 196, 0.3)' : 'rgba(228, 75, 121, 0.3)'}`
           }}>
             <p style={{
               fontSize: '16px',
@@ -398,19 +357,19 @@ const Options: React.FC = () => {
             transition: 'all 0.2s ease'
           }}
           title="Toggle dark mode"
-          onClick={() => handleDarkModeChange(!settings.darkMode)}
+          onClick={() => handleDarkModeChange(!darkMode)}
         >
           <span style={{
             fontSize: '16px',
             color: 'var(--secondary-text)',
             fontWeight: '500'
           }}>
-            {settings.darkMode ? 'Dark' : 'Light'}
+            {darkMode ? 'Dark' : 'Light'}
           </span>
           <div style={{
             width: '44px',
             height: '24px',
-            backgroundColor: settings.darkMode ? 'var(--button-primary)' : '#e5e5e7',
+            backgroundColor: darkMode ? 'var(--button-primary)' : '#e5e5e7',
             borderRadius: '12px',
             position: 'relative',
             transition: 'all 0.3s ease'
@@ -418,7 +377,7 @@ const Options: React.FC = () => {
             <div style={{
               position: 'absolute',
               top: '2px',
-              left: settings.darkMode ? '22px' : '2px',
+              left: darkMode ? '22px' : '2px',
               width: '20px',
               height: '20px',
               backgroundColor: 'white',
@@ -544,7 +503,7 @@ const Options: React.FC = () => {
                 </label>
                 <select
                   value={settings.qualityPreference}
-                  onChange={(e) => handleQualityChange(e.target.value as ModelQuality)}
+                  onChange={(e) => handleQualityChange(e.target.value)}
                   style={{
                     width: '100%',
                     padding: '16px 20px',
@@ -607,7 +566,7 @@ const Options: React.FC = () => {
                 </label>
                 <input
                   type="password"
-                  value={apiKeys[provider]}
+                  value={settings[`${provider}ApiKey` as keyof SettingsData] || ''}
                   onChange={(e) => handleApiKeyChange(provider, e.target.value)}
                   placeholder={`Enter your ${provider} API key`}
                   style={{
@@ -629,9 +588,9 @@ const Options: React.FC = () => {
                   gap: '8px',
                   marginTop: '12px',
                   padding: '12px 16px',
-                  backgroundColor: settings.darkMode ? 'rgba(170, 105, 196, 0.1)' : 'rgba(228, 75, 121, 0.1)',
+                  backgroundColor: darkMode ? 'rgba(170, 105, 196, 0.1)' : 'rgba(228, 75, 121, 0.1)',
                   borderRadius: '12px',
-                  border: `1px solid ${settings.darkMode ? 'rgba(170, 105, 196, 0.3)' : 'rgba(228, 75, 121, 0.3)'}`
+                  border: `1px solid ${darkMode ? 'rgba(170, 105, 196, 0.3)' : 'rgba(228, 75, 121, 0.3)'}`
                 }}>
                   <span style={{ fontSize: '16px' }}>💡</span>
                   <small style={{
@@ -653,31 +612,7 @@ const Options: React.FC = () => {
       {/* Settings Tab */}
       {activeTab === 'settings' && (
         <div>
-          <div style={{ marginBottom: '15px' }}>
-            <label style={{
-              display: 'block',
-              marginBottom: '5px',
-              fontWeight: '500',
-              color: 'var(--text-color)'
-            }}>
-              <input
-                type="checkbox"
-                checked={settings.highlightImportant}
-                onChange={(e) => handleHighlightChange(e.target.checked)}
-                style={{ marginRight: '8px' }}
-              />
-              Highlight Important Parts
-            </label>
-            <small style={{
-              display: 'block',
-              marginTop: '5px',
-              fontSize: '12px',
-              color: 'var(--text-color)',
-              opacity: '0.8'
-            }}>
-              Automatically highlight key information in responses.
-            </small>
-          </div>
+
 
           <div style={{ marginBottom: '15px' }}>
             <label style={{

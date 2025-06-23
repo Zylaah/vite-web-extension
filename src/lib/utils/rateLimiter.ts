@@ -2,10 +2,10 @@
  * Rate limiter utility for Hana extension
  */
 
-// Configuration
-const DEFAULT_LIMIT = 5; // Default requests per minute
+// Configuration - Much more generous like SolBrowse
+const DEFAULT_LIMIT = 50; // Default requests per minute (was 5)
 const DEFAULT_WINDOW = 60 * 1000; // 1 minute in milliseconds
-const BACKOFF_MULTIPLIER = 2; // Exponential backoff multiplier
+const BACKOFF_MULTIPLIER = 1.5; // Gentler exponential backoff multiplier (was 2)
 
 /**
  * Rate limiter for API requests
@@ -46,10 +46,10 @@ export const RateLimiter = {
       this.isLimited = true;
       this.lastLimitTime = now;
       
-      // Calculate exponential backoff
+      // Calculate exponential backoff - much gentler
       this.currentBackoff = this.currentBackoff === 0 
-        ? DEFAULT_WINDOW 
-        : Math.min(this.currentBackoff * BACKOFF_MULTIPLIER, 5 * 60 * 1000); // Max 5 minutes
+        ? 30 * 1000 // Start with just 30 seconds (was 60 seconds)
+        : Math.min(this.currentBackoff * BACKOFF_MULTIPLIER, 2 * 60 * 1000); // Max 2 minutes (was 5 minutes)
       
       return true;
     }

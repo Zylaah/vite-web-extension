@@ -116,33 +116,47 @@ export class ScraperController {
    * Get current page content, checking cache first for better performance
    */
   async getCurrentContent(forceRefresh = false): Promise<string> {
+    const startTime = Date.now();
+    console.log('🔍 Hana ScraperController: getCurrentContent starting, forceRefresh:', forceRefresh);
+    
     // Check cache first unless force refresh is requested
     if (!forceRefresh) {
+      console.log('📋 Hana ScraperController: Checking cache...');
       const cachedContent = await this.cacheManager.getLatestContent(this.tabId);
       if (cachedContent && this.cacheManager.hasRecentContent(this.tabId, 2 * 60 * 1000)) {
-        console.log('Hana ScraperController: Using cached content, length:', cachedContent.length, 'preview:', cachedContent.substring(0, 100));
+        console.log('✅ Hana ScraperController: Using cached content in', Date.now() - startTime, 'ms, length:', cachedContent.length, 'preview:', cachedContent.substring(0, 100));
         return cachedContent;
       }
+      console.log('⚠️ Hana ScraperController: No recent cache, proceeding to fresh scrape');
     }
 
     // Cache miss or force refresh - scrape fresh content
-    return await this.scrapeContentWithCache('manual', true);
+    console.log('🔄 Hana ScraperController: Scraping fresh content...');
+    const result = await this.scrapeContentWithCache('manual', true);
+    console.log('✅ Hana ScraperController: Fresh content scraped in', Date.now() - startTime, 'ms, length:', result.length);
+    return result;
   }
 
   /**
    * Get content optimized for summary (prefer cached content for speed)
    */
   async getContentForSummary(): Promise<string> {
+    const startTime = Date.now();
+    console.log('📝 Hana ScraperController: getContentForSummary starting');
+    
     // For summaries, we prefer cached content to speed up response
+    console.log('📋 Hana ScraperController: Checking cache for summary...');
     const cachedContent = await this.cacheManager.getLatestContent(this.tabId);
     if (cachedContent && this.cacheManager.hasRecentContent(this.tabId, 5 * 60 * 1000)) {
-      console.log('Hana ScraperController: Using cached content for summary, length:', cachedContent.length, 'preview:', cachedContent.substring(0, 100));
+      console.log('✅ Hana ScraperController: Using cached content for summary in', Date.now() - startTime, 'ms, length:', cachedContent.length, 'preview:', cachedContent.substring(0, 100));
       return cachedContent;
     }
 
     // No recent cache - scrape and cache
-    console.log('Hana ScraperController: No recent cache, scraping for summary');
-    return await this.scrapeContentWithCache('manual', true);
+    console.log('🔄 Hana ScraperController: No recent cache, scraping for summary');
+    const result = await this.scrapeContentWithCache('manual', true);
+    console.log('✅ Hana ScraperController: Summary content scraped in', Date.now() - startTime, 'ms, length:', result.length);
+    return result;
   }
 
   /** Check if we can scrape based on rate limiting */

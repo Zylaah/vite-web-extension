@@ -9,7 +9,21 @@ import { decodeHTMLEntities } from './domUtils';
  * @returns The extracted page content as plain text
  */
 export function getPageContent(): string {
+  const startTime = Date.now();
+  console.log('📖 ContentExtractor: Starting extraction');
+  
   try {
+    // Check if we can use cached result from window
+    if ((window as any).hanaPageContentCache && (window as any).hanaPageContentTimestamp) {
+      const age = Date.now() - (window as any).hanaPageContentTimestamp;
+      if (age < 30000) { // Use cache for 30 seconds
+        console.log('⚡ ContentExtractor: Using cached result in', Date.now() - startTime, 'ms');
+        return (window as any).hanaPageContentCache;
+      }
+    }
+    
+    console.log('🔄 ContentExtractor: Starting Readability parsing');
+    
     // Clone the document to avoid modifying the original
     const documentClone = document.cloneNode(true) as Document;
     
@@ -19,15 +33,26 @@ export function getPageContent(): string {
     // Parse the document
     const article = reader.parse();
     
+    console.log('✅ ContentExtractor: Readability parsing completed in', Date.now() - startTime, 'ms');
+    
+    let result: string;
     if (article && article.textContent) {
       // Clean up the text content
-      return cleanupContent(article.textContent);
+      result = cleanupContent(article.textContent);
+    } else {
+      // Fallback to basic extraction if Readability fails
+      console.log('⚠️ ContentExtractor: Readability failed, using fallback');
+      result = fallbackExtraction();
     }
     
-    // Fallback to basic extraction if Readability fails
-    return fallbackExtraction();
+    // Cache the result
+    (window as any).hanaPageContentCache = result;
+    (window as any).hanaPageContentTimestamp = Date.now();
+    
+    console.log('🎯 ContentExtractor: Extraction completed in', Date.now() - startTime, 'ms, length:', result.length);
+    return result;
   } catch (error) {
-    console.error('Error extracting content with Readability:', error);
+    console.error('❌ ContentExtractor: Error in', Date.now() - startTime, 'ms:', error);
     return fallbackExtraction();
   }
 }
