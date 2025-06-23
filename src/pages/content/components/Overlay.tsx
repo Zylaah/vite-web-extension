@@ -164,7 +164,8 @@ const Overlay: React.FC<OverlayProps> = ({
     const handleClickOutside = (event: MouseEvent) => {
       if (event.button !== 0) return; // Only handle left clicks
       
-      if (overlayRef.current && !overlayRef.current.contains(event.target as Node)) {
+      // Only dismiss on click outside in summary mode
+      if (mode === 'summary' && overlayRef.current && !overlayRef.current.contains(event.target as Node)) {
         onClose();
       }
     };
@@ -201,7 +202,7 @@ const Overlay: React.FC<OverlayProps> = ({
         overlayRef.current.removeEventListener('blur', preventBubbling);
       }
     };
-  }, [onClose]);
+  }, [onClose, mode]);
 
   // Handle escape key to close (only in chat mode, summary mode needs close button)
   useEffect(() => {
@@ -462,20 +463,12 @@ const Overlay: React.FC<OverlayProps> = ({
         ref={overlayRef}
         className={`hana-overlay ${mode === 'summary' ? 'summary-mode' : 'chat-mode'} ${hasMessages ? 'has-messages' : ''}`}
       >
-        {/* Summary topbar - only shown in summary mode */}
+        {/* Summary topbar - only shown in summary mode, no close button */}
         {mode === 'summary' && (
           <div className="hana-summary-topbar">
             <h3 className="hana-summary-title">
               AI Response
             </h3>
-            <button
-              onClick={onClose}
-              className="hana-close-button"
-            >
-              <svg style={{ width: '20px', height: '20px' }} fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-              </svg>
-            </button>
           </div>
         )}
 
@@ -508,13 +501,26 @@ const Overlay: React.FC<OverlayProps> = ({
               disabled={isLoading}
             />
             
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="hana-submit-button"
-            >
-              <span>Ask</span>
-            </button>
+            <div className="hana-button-group">
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="hana-submit-button"
+              >
+                <span>Ask</span>
+              </button>
+              
+              <button
+                type="button"
+                onClick={onClose}
+                className="hana-close-button-chat"
+                title="Close chat"
+              >
+                <svg style={{ width: '18px', height: '18px' }} fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
           </form>
         )}
       </div>

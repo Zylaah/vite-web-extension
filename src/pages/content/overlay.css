@@ -511,4 +511,43 @@
 .hana-highlight.importance-3 {
   background-color: rgba(255, 165, 0, 0.4);
   border: 1px solid rgba(255, 165, 0, 0.6);
+}
+
+/* Button group for chat mode */
+.hana-button-group {
+  display: flex !important;
+  gap: 0 !important;
+  align-items: center !important;
+}
+
+/* Close button for chat mode */
+.hana-close-button-chat {
+  padding: 7px !important;
+  cursor: pointer !important;
+  background: transparent !important;
+  border: none !important;
+  color: var(--hana-text-color) !important;
+  transition: all 0.2s ease !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 32px !important;
+  height: 32px !important;
+  opacity: 0.7 !important;
+}
+
+.hana-close-button-chat:hover {
+  opacity: 1 !important;
+}
+
+.hana-close-button-chat:hover svg {
+  fill: var(--hana-primary-light) !important;
+}
+
+:host(.dark-mode) .hana-close-button-chat:hover {
+  color: var(--hana-text-color) !important;
+}
+
+:host(.dark-mode) .hana-close-button-chat:hover svg {
+  fill: var(--hana-primary-dark) !important;
 } 
