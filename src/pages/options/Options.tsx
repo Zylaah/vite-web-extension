@@ -6,6 +6,7 @@ import { BackgroundCommunicator } from '../../lib/services/backgroundCommunicato
 import { PrivacyManager } from '../../lib/services/privacyManager';
 import type { AIProvider } from '../../lib/types';
 import type { SettingsData } from '../../lib/services/storageService';
+import { ContentCacheManager } from '../../lib/services/contentCacheManager';
 
 const Options: React.FC = () => {
   const [settings, setSettings] = useState<SettingsData>({
@@ -19,11 +20,16 @@ const Options: React.FC = () => {
   
   const [darkMode, setDarkMode] = useState(false);
   
-  const [activeTab, setActiveTab] = useState<'providers' | 'settings' | 'info'>('providers');
+  const [activeTab, setActiveTab] = useState<'providers' | 'settings' | 'info' | 'developer'>('providers');
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   const [showInstructions, setShowInstructions] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [testingCompression, setTestingCompression] = useState(false);
+  const [compressionResults, setCompressionResults] = useState<any>(null);
   
   // Load settings on mount
   useEffect(() => {
@@ -107,6 +113,28 @@ const Options: React.FC = () => {
     browser.tabs.create({ url: browser.runtime.getURL('src/privacy/privacy-policy.html') });
   };
   
+  const testCompression = async () => {
+    setTestingCompression(true);
+    setCompressionResults(null);
+    
+    try {
+      const cacheManager = ContentCacheManager.getInstance();
+      const results = await cacheManager.testCompression();
+      setCompressionResults(results);
+      
+      if (results.success) {
+        setMessage({ text: 'Compression test completed successfully!', type: 'success' });
+      } else {
+        setMessage({ text: `Compression test failed: ${results.error}`, type: 'error' });
+      }
+    } catch (error) {
+      console.error('Compression test error:', error);
+      setMessage({ text: 'Compression test failed with error', type: 'error' });
+    } finally {
+      setTestingCompression(false);
+    }
+  };
+
   return (
     <div 
       className="hana-options"
@@ -404,7 +432,7 @@ const Options: React.FC = () => {
         width: 'fit-content',
         margin: '0 auto 40px auto'
       }}>
-        {(['providers', 'settings', 'info'] as const).map(tab => (
+        {(['providers', 'settings', 'info', 'developer'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -423,7 +451,8 @@ const Options: React.FC = () => {
           >
             {tab === 'providers' ? 'AI Providers' : 
              tab === 'settings' ? 'Preferences' : 
-             'Information'}
+             tab === 'info' ? 'Information' :
+             'Developer'}
           </button>
         ))}
       </div>
@@ -659,6 +688,125 @@ const Options: React.FC = () => {
         </div>
       )}
 
+      {/* Developer Tab */}
+      {activeTab === 'developer' && (
+        <div style={{
+          maxWidth: '800px',
+          margin: '0 auto'
+        }}>
+          <div style={{
+            backgroundColor: 'var(--container-bg)',
+            borderRadius: '20px',
+            padding: '32px',
+            boxShadow: 'var(--card-shadow)',
+            border: '1px solid var(--border-color)',
+            marginBottom: '24px'
+          }}>
+            <h2 style={{
+              fontSize: '24px',
+              fontWeight: '700',
+              margin: '0 0 24px 0',
+              color: 'var(--text-color)'
+            }}>
+              Compression Testing
+            </h2>
+            
+            <p style={{
+              color: 'var(--secondary-text)',
+              marginBottom: '20px',
+              lineHeight: '1.6'
+            }}>
+              Test the content compression and decompression functionality used for caching page content.
+            </p>
+            
+            <button 
+              onClick={testCompression}
+              disabled={testingCompression}
+              style={{
+                padding: '12px 24px',
+                backgroundColor: testingCompression ? 'var(--border-color)' : 'var(--button-secondary)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '12px',
+                cursor: testingCompression ? 'not-allowed' : 'pointer',
+                fontSize: '16px',
+                fontWeight: '600',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseEnter={(e) => {
+                if (!testingCompression) {
+                  e.currentTarget.style.backgroundColor = 'var(--button-secondary-hover)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!testingCompression) {
+                  e.currentTarget.style.backgroundColor = 'var(--button-secondary)';
+                }
+              }}
+            >
+              {testingCompression ? 'Testing...' : 'Test Compression'}
+            </button>
+            
+            {compressionResults && (
+              <div style={{
+                marginTop: '24px',
+                padding: '20px',
+                backgroundColor: compressionResults.success ? 'var(--success-bg)' : 'var(--error-bg)',
+                borderRadius: '12px',
+                border: `1px solid ${compressionResults.success ? 'var(--success-color)' : 'var(--error-color)'}`
+              }}>
+                <h3 style={{
+                  fontSize: '18px',
+                  fontWeight: '600',
+                  margin: '0 0 16px 0',
+                  color: compressionResults.success ? 'var(--success-color)' : 'var(--error-color)'
+                }}>
+                  Test Results
+                </h3>
+                
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                  gap: '12px',
+                  fontSize: '14px',
+                  color: 'var(--text-color)'
+                }}>
+                  <div>
+                    <strong>Success:</strong> {compressionResults.success ? 'Yes' : 'No'}
+                  </div>
+                  <div>
+                    <strong>Native Support:</strong> {compressionResults.nativeCompressionAvailable ? 'Yes' : 'No'}
+                  </div>
+                  {compressionResults.success && (
+                    <>
+                      <div>
+                        <strong>Compression Ratio:</strong> {(compressionResults.results.compressionRatio * 100).toFixed(1)}%
+                      </div>
+                      <div>
+                        <strong>Round Trip:</strong> {compressionResults.results.roundTripSuccess ? 'Success' : 'Failed'}
+                      </div>
+                    </>
+                  )}
+                </div>
+                
+                {compressionResults.error && (
+                  <div style={{
+                    marginTop: '12px',
+                    padding: '12px',
+                    backgroundColor: 'rgba(255, 0, 0, 0.1)',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    color: 'var(--error-color)'
+                  }}>
+                    <strong>Error:</strong> {compressionResults.error}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Info Tab */}
       {activeTab === 'info' && (
         <div>
@@ -767,6 +915,21 @@ const Options: React.FC = () => {
           color: saveMessage.includes('Failed') ? 'var(--error-color)' : 'var(--success-color)'
         }}>
           {saveMessage}
+        </div>
+      )}
+
+      {/* Compression Test Message */}
+      {message && (
+        <div style={{
+          marginTop: '10px',
+          padding: '8px',
+          borderRadius: '4px',
+          fontSize: '12px',
+          textAlign: 'center',
+          backgroundColor: message.type === 'error' ? 'var(--error-bg)' : 'var(--success-bg)',
+          color: message.type === 'error' ? 'var(--error-color)' : 'var(--success-color)'
+        }}>
+          {message.text}
         </div>
       )}
 

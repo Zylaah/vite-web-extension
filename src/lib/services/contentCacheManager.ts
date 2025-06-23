@@ -39,7 +39,7 @@ export class ContentCacheManager {
     this.options = {
       maxSnapshotsPerTab: 5,
       maxContentLength: 500_000, // 500KB
-      compressionThreshold: 50_000, // 50KB - increase threshold to avoid compressing smaller content
+      compressionThreshold: 50_000, // 50KB - compress content larger than this size
       maxCacheAge: 24 * 60 * 60 * 1000, // 24 hours
       ...options
     };
@@ -64,8 +64,8 @@ export class ContentCacheManager {
     const tabId = snapshot.tabId;
     const originalLength = snapshot.content.length;
     
-    // Temporarily disable compression to isolate the issue
-    const shouldCompress = false; // originalLength > this.options.compressionThreshold;
+    // Re-enable compression for content larger than threshold
+    const shouldCompress = originalLength > this.options.compressionThreshold;
     let processedContent = snapshot.content;
     let isCompressed = false;
 
@@ -82,7 +82,7 @@ export class ContentCacheManager {
     }
 
     if (this.debug) {
-      console.log(`Hana ContentCache: Storing content uncompressed, length: ${processedContent.length}`);
+      console.log(`Hana ContentCache: Storing content ${isCompressed ? 'compressed' : 'uncompressed'}, length: ${processedContent.length}`);
     }
 
     // Truncate if still too large
@@ -172,14 +172,29 @@ export class ContentCacheManager {
       try {
         const decompressed = await this.decompressContent(snapshot.content);
         console.log(`Hana ContentCache: Decompressed content from ${snapshot.content.length} to ${decompressed.length} chars`);
-        return decompressed;
+        
+        // Verify decompression worked by checking if content looks readable
+        if (decompressed.length > 0 && decompressed.includes(' ')) {
+          console.log(`Hana ContentCache: Decompression successful, content preview: "${decompressed.substring(0, 100)}..."`);
+          return decompressed;
+        } else {
+          console.error('Hana ContentCache: Decompressed content appears invalid:', decompressed.substring(0, 100));
+          throw new Error('Decompressed content appears invalid');
+        }
       } catch (error) {
         console.error('Hana ContentCache: Failed to decompress content:', error);
-        // Fallback: return compressed content (might be readable if simple compression)
-        return snapshot.content;
+        console.error('Hana ContentCache: Compressed content preview:', snapshot.content.substring(0, 100));
+        
+        // Clear the corrupted snapshot to prevent future issues
+        this.clearTab(tabId);
+        console.log('Hana ContentCache: Cleared corrupted snapshot for tab', tabId);
+        
+        // Return null to force fresh content extraction
+        return null;
       }
     }
 
+    console.log(`Hana ContentCache: Returning uncompressed content, preview: "${snapshot.content.substring(0, 100)}..."`);
     return snapshot.content;
   }
 
@@ -325,59 +340,109 @@ export class ContentCacheManager {
           offset += chunk.length;
         }
 
-        // Convert to base64 for storage
-        return this.arrayBufferToBase64(compressedData);
+        // Convert to base64 for storage and add native compression prefix
+        return 'GZIP:' + this.arrayBufferToBase64(compressedData);
       } catch (error) {
         console.warn('Hana ContentCache: Native compression failed, using fallback:', error);
       }
     }
 
-    // Fallback to simple compression
-    return this.simpleCompress(content);
+    // Fallback to simple compression and add simple compression prefix
+    return 'SIMPLE:' + this.simpleCompress(content);
   }
 
   /**
    * Decompress content
    */
   private async decompressContent(compressedContent: string): Promise<string> {
-    // Try native decompression first
-    if ('DecompressionStream' in window) {
+    // Check compression method by prefix
+    if (compressedContent.startsWith('GZIP:')) {
+      // Native gzip decompression
+      if ('DecompressionStream' in window) {
+        try {
+          // Remove prefix and convert base64 to Uint8Array
+          const base64Data = compressedContent.substring(5); // Remove 'GZIP:' prefix
+          const compressedData = this.base64ToArrayBuffer(base64Data);
+          
+          const stream = new DecompressionStream('gzip');
+          const writer = stream.writable.getWriter();
+          const reader = stream.readable.getReader();
+
+          // Write compressed data
+          writer.write(compressedData);
+          writer.close();
+
+          // Read decompressed data
+          const chunks: Uint8Array[] = [];
+          let result;
+          while (!(result = await reader.read()).done) {
+            chunks.push(result.value);
+          }
+
+          // Combine chunks and convert to string
+          const decompressedData = new Uint8Array(chunks.reduce((acc, chunk) => acc + chunk.length, 0));
+          let offset = 0;
+          for (const chunk of chunks) {
+            decompressedData.set(chunk, offset);
+            offset += chunk.length;
+          }
+
+          const decoder = new TextDecoder();
+          return decoder.decode(decompressedData);
+        } catch (error) {
+          console.error('Hana ContentCache: Native decompression failed:', error);
+          throw error; // Don't fallback, this should work
+        }
+      } else {
+        throw new Error('Native compression not available but GZIP data detected');
+      }
+    } else if (compressedContent.startsWith('SIMPLE:')) {
+      // Simple decompression
+      const simpleData = compressedContent.substring(7); // Remove 'SIMPLE:' prefix
+      return this.simpleDecompress(simpleData);
+    } else {
+      // Legacy data without prefix - try to detect format
+      console.warn('Hana ContentCache: No compression method prefix found, attempting auto-detection');
+      
+      // Try simple decompression first (JSON format)
       try {
-        // Convert base64 to Uint8Array
-        const compressedData = this.base64ToArrayBuffer(compressedContent);
-        
-        const stream = new DecompressionStream('gzip');
-        const writer = stream.writable.getWriter();
-        const reader = stream.readable.getReader();
-
-        // Write compressed data
-        writer.write(compressedData);
-        writer.close();
-
-        // Read decompressed data
-        const chunks: Uint8Array[] = [];
-        let result;
-        while (!(result = await reader.read()).done) {
-          chunks.push(result.value);
-        }
-
-        // Combine chunks and convert to string
-        const decompressedData = new Uint8Array(chunks.reduce((acc, chunk) => acc + chunk.length, 0));
-        let offset = 0;
-        for (const chunk of chunks) {
-          decompressedData.set(chunk, offset);
-          offset += chunk.length;
-        }
-
-        const decoder = new TextDecoder();
-        return decoder.decode(decompressedData);
+        return this.simpleDecompress(compressedContent);
       } catch (error) {
-        console.warn('Hana ContentCache: Native decompression failed, using fallback:', error);
+        // If that fails, try native decompression
+        if ('DecompressionStream' in window) {
+          try {
+            const compressedData = this.base64ToArrayBuffer(compressedContent);
+            const stream = new DecompressionStream('gzip');
+            const writer = stream.writable.getWriter();
+            const reader = stream.readable.getReader();
+
+            writer.write(compressedData);
+            writer.close();
+
+            const chunks: Uint8Array[] = [];
+            let result;
+            while (!(result = await reader.read()).done) {
+              chunks.push(result.value);
+            }
+
+            const decompressedData = new Uint8Array(chunks.reduce((acc, chunk) => acc + chunk.length, 0));
+            let offset = 0;
+            for (const chunk of chunks) {
+              decompressedData.set(chunk, offset);
+              offset += chunk.length;
+            }
+
+            const decoder = new TextDecoder();
+            return decoder.decode(decompressedData);
+          } catch (nativeError) {
+            console.error('Hana ContentCache: Both decompression methods failed:', { simpleError: error, nativeError });
+            throw new Error('Unable to decompress content with any method');
+          }
+        } else {
+          throw error; // Re-throw simple decompression error
+        }
       }
     }
-
-    // Fallback to simple decompression
-    return this.simpleDecompress(compressedContent);
   }
 
   /**
@@ -491,6 +556,88 @@ export class ContentCacheManager {
       return new URL(url).hostname;
     } catch {
       return 'unknown';
+    }
+  }
+
+  /**
+   * Test compression and decompression functionality
+   * This method can be called to verify the compression implementation works correctly
+   */
+  async testCompression(testContent?: string): Promise<{
+    success: boolean;
+    nativeCompressionAvailable: boolean;
+    results: {
+      original: string;
+      compressed: string;
+      decompressed: string;
+      compressionRatio: number;
+      roundTripSuccess: boolean;
+    };
+    error?: string;
+  }> {
+    const content = testContent || `
+      This is a test content for compression testing. 
+      It contains repeated patterns that should compress well.
+      Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+      Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+      Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+      The quick brown fox jumps over the lazy dog.
+      The quick brown fox jumps over the lazy dog.
+      The quick brown fox jumps over the lazy dog.
+      Testing compression with various patterns and repeated text.
+      Testing compression with various patterns and repeated text.
+      Testing compression with various patterns and repeated text.
+    `.repeat(10);
+
+    try {
+      console.log('🧪 Testing compression with content length:', content.length);
+      
+      // Test compression
+      const compressed = await this.compressContent(content);
+      console.log('✅ Compression successful, compressed length:', compressed.length);
+      
+      // Test decompression
+      const decompressed = await this.decompressContent(compressed);
+      console.log('✅ Decompression successful, decompressed length:', decompressed.length);
+      
+      // Verify round-trip
+      const roundTripSuccess = content === decompressed;
+      const compressionRatio = compressed.length / content.length;
+      
+      console.log('📊 Compression test results:', {
+        originalLength: content.length,
+        compressedLength: compressed.length,
+        decompressedLength: decompressed.length,
+        compressionRatio: (compressionRatio * 100).toFixed(2) + '%',
+        roundTripSuccess,
+        nativeCompressionAvailable: 'CompressionStream' in window
+      });
+
+      return {
+        success: true,
+        nativeCompressionAvailable: 'CompressionStream' in window,
+        results: {
+          original: content.substring(0, 200) + '...',
+          compressed: compressed.substring(0, 200) + '...',
+          decompressed: decompressed.substring(0, 200) + '...',
+          compressionRatio,
+          roundTripSuccess
+        }
+      };
+    } catch (error) {
+      console.error('❌ Compression test failed:', error);
+      return {
+        success: false,
+        nativeCompressionAvailable: 'CompressionStream' in window,
+        results: {
+          original: content.substring(0, 200) + '...',
+          compressed: '',
+          decompressed: '',
+          compressionRatio: 1,
+          roundTripSuccess: false
+        },
+        error: error instanceof Error ? error.message : String(error)
+      };
     }
   }
 } 
