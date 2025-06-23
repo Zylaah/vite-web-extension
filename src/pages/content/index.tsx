@@ -1,167 +1,106 @@
 /**
- * Content script for Hana extension
+ * New Content Script for Hana extension
+ * Based on SolBrowse's controller architecture
  */
-import React, { useState, useEffect, useRef } from 'react';
-import { createRoot } from 'react-dom/client';
 import browser from 'webextension-polyfill';
-import { getPageContent } from '../../lib/utils/contentExtractor';
-import { BackgroundCommunicator } from '../../lib/services/backgroundCommunicator';
-import { HighlightService } from '../../lib/services/highlightService';
-import { ImportantTextPart } from '../../lib/types';
-import Overlay from './components/Overlay';
-import './style.css';
-import overlayStyles from './overlay.css?inline';
+import { TabConversationManager } from '../../lib/utils/tabConversationManager';
+import { OverlayController } from '../../lib/controllers/overlayController';
+import { ScraperController } from '../../lib/controllers/scraperController';
 
-// Create shadow DOM for isolation
-const createShadowContainer = () => {
-  // Create container
-  const container = document.createElement('div');
-  container.id = 'hana-extension-container';
-  document.body.appendChild(container);
-  
-  // Create shadow root
-  const shadowRoot = container.attachShadow({ mode: 'open' });
-  
-  // Create app container inside shadow root
-  const appContainer = document.createElement('div');
-  appContainer.id = 'hana-app';
-  shadowRoot.appendChild(appContainer);
-  
-  // Inject overlay styles into shadow DOM
-  const styleElement = document.createElement('style');
-  styleElement.textContent = overlayStyles;
-  shadowRoot.appendChild(styleElement);
-  
-  return appContainer;
+// Detect whether we are executing inside an extension-origin page
+const isExtensionContext = (): boolean => {
+  if (
+    window.location.protocol === 'chrome-extension:' ||
+    window.location.protocol === 'moz-extension:' ||
+    window.location.protocol === 'ms-browser-extension:'
+  ) {
+    return true;
+  }
+  if (
+    window.location.href.includes('chrome-extension://') ||
+    window.location.href.includes('moz-extension://')
+  ) {
+    return true;
+  }
+  return false;
 };
 
-// Main content script
-const main = async () => {
-  console.log('Hana content script loaded');
-  
-  // Extract page content
-  const pageContent = getPageContent();
-  console.log(`Extracted ${pageContent.length} characters from page`);
-  
-  // Create container
-  const container = createShadowContainer();
-  const root = createRoot(container);
-  
-  // Get shadow root for highlighting
-  const shadowRoot = document.getElementById('hana-extension-container')?.shadowRoot;
-  
-  // Render app
-  const App = () => {
-    const [showOverlay, setShowOverlay] = useState(false);
-    const [overlayMode, setOverlayMode] = useState<'chat' | 'summary'>('chat');
-    const [importantParts, setImportantParts] = useState<ImportantTextPart[]>([]);
-    
-    const handleModeChange = (mode: 'chat' | 'summary') => {
-      setOverlayMode(mode);
-    };
-    
-    // Listen for keyboard shortcuts
-    useEffect(() => {
-      const handleKeyDown = async (e: KeyboardEvent) => {
-        // Ctrl+Alt+F for instant summary
-        if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'f') {
-          e.preventDefault();
-          e.stopPropagation();
-          
-          // Show overlay in summary mode (it will auto-trigger summary)
-          setOverlayMode('summary');
-          setShowOverlay(true);
-          return;
-        }
-        
-        // Default shortcut: Alt+F to toggle overlay in chat mode
-        if (e.altKey && e.key.toLowerCase() === 'f') {
-          e.preventDefault();
-          e.stopPropagation();
-          
-          if (showOverlay && overlayMode === 'chat') {
-            // If already in chat mode, just toggle visibility
-            setShowOverlay(false);
-          } else {
-            // Force chat mode and show overlay
-            setOverlayMode('chat');
-            setShowOverlay(true);
-          }
-        }
-      };
-      
-      document.addEventListener('keydown', handleKeyDown);
-      return () => {
-        document.removeEventListener('keydown', handleKeyDown);
-      };
-    }, []);
-    
-    // Listen for messages from background script
-    useEffect(() => {
-      const handleMessage = (message: any) => {
-        if (message.action === 'toggle-overlay') {
-          setShowOverlay(prev => !prev);
-        }
-        
-        // Handle importance analysis results
-        if (message.action === 'analysis-complete' && message.importantParts) {
-          console.log('Received importance analysis results:', message.importantParts);
-          setImportantParts(message.importantParts);
-          
-          // Apply highlights if shadow root is available
-          if (shadowRoot) {
-            HighlightService.highlightImportantText(message.importantParts, shadowRoot);
-          }
-        }
-        
-        // Handle analysis errors
-        if (message.action === 'analysis-error') {
-          console.error('Analysis error:', message.error);
-        }
-      };
-      
-      browser.runtime.onMessage.addListener(handleMessage);
-      return () => {
-        browser.runtime.onMessage.removeListener(handleMessage);
-      };
-    }, []);
-    
-    // Function to analyze page content for important parts
-    const analyzeImportance = async () => {
-      try {
-        console.log('Requesting importance analysis...');
-        await BackgroundCommunicator.analyzeImportance(pageContent);
-      } catch (error) {
-        console.error('Error requesting importance analysis:', error);
-      }
-    };
-    
-    // Function to clear highlights
-    const clearHighlights = () => {
-      if (shadowRoot) {
-        HighlightService.removeHighlights(shadowRoot);
-        setImportantParts([]);
-      }
-    };
-    
-    return showOverlay ? (
-      <Overlay 
-        onClose={() => {
-          setShowOverlay(false);
-          // Reset to chat mode when closing overlay
-          setTimeout(() => setOverlayMode('chat'), 0);
-        }}
-        pageContent={pageContent}
-        initialMode={overlayMode}
-        onModeChange={handleModeChange}
-      />
-    ) : null;
-  };
-  
-  root.render(<App />);
-};
+// Ask background script for the tab ID
+async function getTabId(): Promise<number | null> {
+  try {
+    const response = (await browser.runtime.sendMessage({
+      type: 'GET_CURRENT_TAB_ID',
+    })) as { tabId?: number };
+    return typeof response?.tabId === 'number' ? response.tabId : null;
+  } catch (error) {
+    console.error('Hana Content Script: Error getting tab ID:', error);
+    return null;
+  }
+}
 
-// Run main function
-main().catch(error => {
-  console.error('Error in Hana content script:', error);
-});
+// Entry point
+if (isExtensionContext()) {
+  console.log('Hana Content Script: Skipping execution in extension context');
+} else {
+  (async () => {
+    try {
+      // Prevent multiple injections (e.g. due to SPA re-rendering)
+      if ((window as any).hanaContentScript) {
+        console.log('Hana Content Script: Already initialised');
+        return;
+      }
+
+      const tabId = await getTabId();
+      if (tabId == null) {
+        console.warn('Hana Content Script: Could not obtain tab ID, aborting initialisation.');
+        return;
+      }
+
+    // Expose for debugging
+    (window as any).hanaTabId = tabId;
+
+    // Instantiate controllers following SolBrowse pattern
+    const tabManager = TabConversationManager.getInstance();
+    const overlay = new OverlayController(tabManager);
+    const scraper = new ScraperController(tabId);
+
+    // Connect scraper to overlay state
+    scraper.setOverlayOpenCallback(() => overlay.isVisible());
+    overlay.setOnOpenCallback(() => scraper.triggerManualScrape());
+
+    await Promise.all([overlay.init(), scraper.init()]);
+
+    // Start scraping immediately; controllers can later coordinate if needed
+    scraper.start();
+
+    // Expose globally for debugging/testing
+    (window as any).hanaContentScript = { overlay, scraper, tabManager };
+
+    // Listen for debug context requests from the overlay
+    window.addEventListener('message', (event) => {
+      if (event.data?.type === 'hana-copy-context') {
+        const context = {
+          url: window.location.href,
+          title: document.title,
+          lastScrape: scraper.getLastScrapeContent(),
+        };
+        (event.source as Window)?.postMessage({ 
+          type: 'hana-context-response', 
+          context 
+        }, '*' as any);
+      }
+    });
+
+    // Cleanup
+    window.addEventListener('beforeunload', () => {
+      overlay.cleanup();
+      scraper.cleanup();
+      console.log('Hana Content Script: Cleaned up controllers');
+    });
+
+    console.log('Hana Content Script: Successfully initialized with controller architecture');
+    } catch (error) {
+      console.error('Hana Content Script: Error during initialization:', error);
+    }
+  })();
+} 

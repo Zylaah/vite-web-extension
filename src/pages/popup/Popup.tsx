@@ -11,6 +11,19 @@ const Popup: React.FC = () => {
     highlightImportant: true
   });
   
+  // Detect system dark mode for UI styling only
+  const [systemDarkMode, setSystemDarkMode] = useState(
+    window.matchMedia('(prefers-color-scheme: dark)').matches
+  );
+  
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e: MediaQueryListEvent) => setSystemDarkMode(e.matches);
+    
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
+  
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
 
@@ -59,19 +72,7 @@ const Popup: React.FC = () => {
     }
   };
   
-  // Handle dark mode toggle
-  const handleDarkModeToggle = async () => {
-    const newDarkMode = !settings.darkMode;
-    setSettings(prev => ({ ...prev, darkMode: newDarkMode }));
-    
-    try {
-      await StorageService.updateSettings({ darkMode: newDarkMode });
-      setMessage(`Dark mode ${newDarkMode ? 'enabled' : 'disabled'}`);
-    } catch (error) {
-      console.error('Error updating dark mode:', error);
-      setMessage('Error updating dark mode');
-    }
-  };
+
   
   // Handle highlight toggle
   const handleHighlightToggle = async () => {
@@ -97,16 +98,9 @@ const Popup: React.FC = () => {
   }
 
   return (
-    <div className={`p-4 min-w-[300px] ${settings.darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-800'}`}>
+    <div className={`p-4 min-w-[300px] ${systemDarkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-800'}`}>
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-xl font-bold">Hana AI Assistant</h1>
-        <button 
-          onClick={handleDarkModeToggle}
-          className="p-2 rounded-full"
-          aria-label={settings.darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-        >
-          {settings.darkMode ? '☀️' : '🌙'}
-        </button>
       </div>
       
       {message && (
@@ -120,7 +114,7 @@ const Popup: React.FC = () => {
         <select 
           value={settings.selectedProvider} 
           onChange={handleProviderChange}
-          className={`w-full p-2 rounded border ${settings.darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
+          className={`w-full p-2 rounded border ${systemDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
         >
           <option value="mistral">Mistral AI</option>
           <option value="openai">OpenAI</option>
@@ -134,7 +128,7 @@ const Popup: React.FC = () => {
         <select 
           value={settings.qualityPreference} 
           onChange={handleQualityChange}
-          className={`w-full p-2 rounded border ${settings.darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
+          className={`w-full p-2 rounded border ${systemDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
         >
           <option value="fast">Fast (smaller model)</option>
           <option value="accurate">Accurate (larger model)</option>
@@ -156,7 +150,7 @@ const Popup: React.FC = () => {
         <button 
           onClick={openOptions}
           className={`px-4 py-2 rounded ${
-            settings.darkMode 
+            systemDarkMode 
               ? 'bg-purple-600 hover:bg-purple-700 text-white' 
               : 'bg-pink-600 hover:bg-pink-700 text-white'
           }`}

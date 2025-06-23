@@ -12,14 +12,26 @@ import { ImportanceAnalyzer } from '../../lib/services/importanceAnalyzer';
 console.log('Hana background script loaded');
 
 /**
+ * Handle extension installation
+ */
+browser.runtime.onInstalled.addListener(async (details) => {
+  if (details.reason === 'install') {
+    console.log('Extension installed, opening options page');
+    // Open the options page on first install
+    await browser.runtime.openOptionsPage();
+  }
+});
+
+/**
  * Main message listener
  */
 browser.runtime.onMessage.addListener((message: any, sender, sendResponse) => {
   // Wrap in async IIFE to use await
   (async () => {
-    console.log(`Received message action: ${message.action}`);
+    const messageType = message.action || message.type;
+    console.log(`Received message: ${messageType}`);
     
-    switch (message.action) {
+    switch (messageType) {
       case 'query-ai':
         // Check privacy first
         if (!(await PrivacyManager.canRun())) {
@@ -179,6 +191,15 @@ browser.runtime.onMessage.addListener((message: any, sender, sendResponse) => {
       case 'get-shortcut':
         // Placeholder for keyboard shortcut management
         sendResponse({ name: 'toggle-input', shortcut: 'Alt+F' });
+        break;
+
+      case 'GET_CURRENT_TAB_ID':
+        // Return the current tab ID for the content script
+        if (sender.tab?.id) {
+          sendResponse({ tabId: sender.tab.id });
+        } else {
+          sendResponse({ error: 'No tab ID available' });
+        }
         break;
 
       case 'encrypt-api-key':

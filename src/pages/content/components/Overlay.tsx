@@ -15,113 +15,35 @@ interface OverlayProps {
   pageContent: string;
   initialMode?: OverlayMode;
   onModeChange?: (mode: OverlayMode) => void;
+  getPageContent?: () => string;
+  existingConversation?: any;
+  onConversationUpdate?: (messages: any[], conversationId: string | null) => void;
 }
-
-// Custom hook for overlay state management
-const useOverlayState = (initialMode: OverlayMode = 'chat') => {
-  const [mode, setMode] = useState<OverlayMode>(initialMode);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [response, setResponse] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  
-  const switchMode = (newMode: OverlayMode) => {
-    // Clear state when switching modes
-    setResponse('');
-    setError(null);
-    setIsLoading(false);
-    setIsStreaming(false);
-    setMode(newMode);
-  };
-  
-  const resetState = () => {
-    setResponse('');
-    setError(null);
-    setIsLoading(false);
-    setIsStreaming(false);
-  };
-  
-  return {
-    mode,
-    isLoading,
-    isStreaming,
-    response,
-    error,
-    setIsLoading,
-    setIsStreaming,
-    setResponse,
-    setError,
-    switchMode,
-    resetState
-  };
-};
-
-// Custom hook for AI requests
-const useAIRequest = (
-  setIsLoading: (loading: boolean) => void,
-  setIsStreaming: (streaming: boolean) => void,
-  setResponse: (response: string) => void,
-  setError: (error: string | null) => void
-) => {
-  const makeRequest = async (prompt: string, pageContent: string, settings: OverlaySettings) => {
-    setIsLoading(true);
-    setError(null);
-    setResponse('');
-    
-    try {
-      setIsStreaming(true);
-      const result = await BackgroundCommunicator.queryAIStreaming({
-        prompt,
-        provider: settings.selectedProvider,
-        model: settings.qualityPreference,
-        pageContent
-      });
-      
-      if (!result.received) {
-        setError('Failed to start streaming request');
-        setIsLoading(false);
-        setIsStreaming(false);
-      }
-    } catch (e: any) {
-      setError(e.message || 'An error occurred while processing your request');
-      setIsLoading(false);
-      setIsStreaming(false);
-    }
-  };
-  
-  return { makeRequest };
-};
 
 const Overlay: React.FC<OverlayProps> = ({ 
   onClose, 
   pageContent,
   initialMode = 'chat',
-  onModeChange
+  onModeChange,
+  getPageContent,
+  existingConversation,
+  onConversationUpdate
 }) => {
   const overlayRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const responseRef = useRef<HTMLDivElement>(null);
+  
+  const [mode, setMode] = useState<OverlayMode>(initialMode);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState<OverlaySettings>({
     selectedProvider: 'mistral',
     qualityPreference: 'quality'
   });
+  const [conversationId, setConversationId] = useState<string | null>(null);
   
-  const {
-    mode,
-    isLoading,
-    isStreaming,
-    response,
-    error,
-    setIsLoading,
-    setIsStreaming,
-    setResponse,
-    setError,
-    switchMode,
-    resetState
-  } = useOverlayState(initialMode);
-  
-  const { makeRequest } = useAIRequest(setIsLoading, setIsStreaming, setResponse, setError);
-  
-  // Load settings
+  // Load settings and restore conversation
   useEffect(() => {
     const loadSettings = async () => {
       const result = await browser.storage.sync.get([
@@ -129,14 +51,58 @@ const Overlay: React.FC<OverlayProps> = ({
         'qualityPreference'
       ]);
       
-             setSettings({
-         selectedProvider: (result.selectedProvider as string) || 'mistral',
-         qualityPreference: (result.qualityPreference as string) || 'quality'
-       });
+      setSettings({
+        selectedProvider: (result.selectedProvider as string) || 'mistral',
+        qualityPreference: (result.qualityPreference as string) || 'quality'
+      });
     };
     
+    // Schedule conversation restoration after DOM is ready (only in chat mode)
+    if (mode === 'chat' && existingConversation && existingConversation.messages && existingConversation.messages.length > 0) {
+      setConversationId(existingConversation.conversationId);
+      
+      // Use setTimeout to ensure DOM is ready
+      setTimeout(() => {
+        if (responseRef.current) {
+          // Clear any existing content
+          responseRef.current.innerHTML = '';
+          
+          // Restore messages to DOM
+          existingConversation.messages.forEach((msg: any) => {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `hana-chat-message ${msg.role === 'user' ? 'user-message' : 'ai-message'}`;
+            messageDiv.textContent = msg.content;
+            responseRef.current!.appendChild(messageDiv);
+          });
+          
+          // Show container and scroll to bottom
+          responseRef.current.style.display = 'block';
+          responseRef.current.scrollTop = responseRef.current.scrollHeight;
+        }
+      }, 100);
+    }
+    
     loadSettings();
-  }, []);
+  }, [existingConversation]);
+
+  // Additional effect to restore conversation when responseRef becomes available (only in chat mode)
+  useEffect(() => {
+    if (mode === 'chat' && responseRef.current && existingConversation && existingConversation.messages && 
+        existingConversation.messages.length > 0 && responseRef.current.children.length === 0) {
+      
+      // Restore messages to DOM
+      existingConversation.messages.forEach((msg: any) => {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `hana-chat-message ${msg.role === 'user' ? 'user-message' : 'ai-message'}`;
+        messageDiv.textContent = msg.content;
+        responseRef.current!.appendChild(messageDiv);
+      });
+      
+      // Show container and scroll to bottom
+      responseRef.current.style.display = 'block';
+      responseRef.current.scrollTop = responseRef.current.scrollHeight;
+    }
+  }, [mode, responseRef.current, existingConversation]);
   
   // Handle mode changes
   useEffect(() => {
@@ -144,16 +110,26 @@ const Overlay: React.FC<OverlayProps> = ({
       onModeChange(mode);
     }
     
-    // Auto-trigger summary when switching to summary mode
+    // Clear content when switching modes first
+    if (responseRef.current) {
+      responseRef.current.innerHTML = '';
+    }
+    setError(null);
+    setIsLoading(false);
+    setIsStreaming(false);
+    
+    // Auto-trigger summary when switching to summary mode (delay to ensure DOM is ready)
     if (mode === 'summary' && settings.selectedProvider) {
-      makeRequest('Please provide a comprehensive summary of this page.', pageContent, settings);
+      setTimeout(() => {
+        handleRequest('Please provide a comprehensive summary of this page.');
+      }, 100);
     }
     
     // Auto-focus input when switching to chat mode
     if (mode === 'chat' && inputRef.current) {
       inputRef.current.focus();
     }
-  }, [mode, settings, pageContent, onModeChange]);
+  }, [mode, settings.selectedProvider, settings.qualityPreference, pageContent, onModeChange]);
 
   // Event handling
   useEffect(() => {
@@ -216,21 +192,60 @@ const Overlay: React.FC<OverlayProps> = ({
   // Handle streaming messages
   useEffect(() => {
     const handleMessage = (message: any) => {
-      if (message.action === 'streaming-chunk' && message.chunk) {
-        setResponse(message.chunk.text);
+      if (message.action === 'streaming-chunk' && message.chunk && responseRef.current) {
+        // For streaming chunks, check if we're currently streaming
+        if (isStreaming) {
+          // Find the last streaming response based on mode
+          let lastStreamingElement: Element | null = null;
+          
+          if (mode === 'chat') {
+            lastStreamingElement = responseRef.current.querySelector('.hana-chat-message.ai-message:last-child .hana-streaming-response');
+          } else {
+            lastStreamingElement = responseRef.current.querySelector('.hana-streaming-response:last-child');
+          }
+          
+          if (!lastStreamingElement) {
+            // Create new streaming element
+            if (mode === 'chat') {
+              const aiMessageDiv = document.createElement('div');
+              aiMessageDiv.className = 'hana-chat-message ai-message';
+              aiMessageDiv.innerHTML = '<div class="hana-streaming-response">' + message.chunk.text + '</div>';
+              responseRef.current.appendChild(aiMessageDiv);
+            } else {
+              // In summary mode, create direct streaming response
+              const streamingDiv = document.createElement('div');
+              streamingDiv.className = 'hana-streaming-response';
+              streamingDiv.textContent = message.chunk.text;
+              responseRef.current.appendChild(streamingDiv);
+            }
+            setIsLoading(false);
+          } else {
+            // Update existing streaming message
+            lastStreamingElement.textContent = message.chunk.text;
+          }
+          
+          // Scroll to bottom
+          responseRef.current.scrollTop = responseRef.current.scrollHeight;
+        }
       }
       
       if (message.action === 'streaming-complete') {
         setIsLoading(false);
         setIsStreaming(false);
         
-        if (message.response) {
-          if (message.response.error) {
-            setError(message.response.text);
-            setResponse('');
-          } else {
-            setResponse(message.response.text);
+        if (responseRef.current) {
+          // Mark the last streaming response as done (removes cursor)
+          const lastStreamingResponse = responseRef.current.querySelector('.hana-streaming-response:last-child');
+          if (lastStreamingResponse) {
+            lastStreamingResponse.classList.add('done');
           }
+          
+          // Save conversation state when streaming completes
+          saveConversationState();
+        }
+        
+        if (message.response && message.response.error) {
+          setError(message.response.text);
         }
       }
       
@@ -238,7 +253,6 @@ const Overlay: React.FC<OverlayProps> = ({
         setError(message.error || 'An error occurred during streaming');
         setIsLoading(false);
         setIsStreaming(false);
-        setResponse('');
       }
     };
     
@@ -246,7 +260,95 @@ const Overlay: React.FC<OverlayProps> = ({
     return () => {
       browser.runtime.onMessage.removeListener(handleMessage);
     };
-  }, []);
+  }, [isStreaming, mode]);
+
+  const getChatContext = () => {
+    if (!responseRef.current || mode !== 'chat') return '';
+    
+    const messages = responseRef.current.querySelectorAll('.hana-chat-message');
+    if (messages.length === 0) return '';
+    
+    let context = 'PREVIOUS CONVERSATION:\n';
+    messages.forEach(msg => {
+      if (msg.classList.contains('user-message')) {
+        context += `User: ${msg.textContent}\n`;
+      } else if (msg.classList.contains('ai-message')) {
+        context += `Assistant: ${msg.textContent}\n`;
+      }
+    });
+    context += '\nNEW QUESTION:\n';
+    return context;
+  };
+
+  const saveConversationState = () => {
+    if (!responseRef.current || !onConversationUpdate) return;
+    
+    const messages = responseRef.current.querySelectorAll('.hana-chat-message');
+    const conversationMessages = Array.from(messages).map(msg => ({
+      role: msg.classList.contains('user-message') ? 'user' : 'assistant',
+      content: msg.textContent || '',
+      timestamp: Date.now()
+    }));
+    
+    // Generate conversation ID if we don't have one
+    const currentConversationId = conversationId || `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    if (!conversationId) {
+      setConversationId(currentConversationId);
+    }
+    
+    onConversationUpdate(conversationMessages, currentConversationId);
+  };
+
+  const handleRequest = async (prompt: string) => {
+    if (!responseRef.current) {
+      return;
+    }
+    
+    setIsLoading(true);
+    setError(null);
+    
+    // Add user message to chat in chat mode
+    if (mode === 'chat') {
+      const userMessageDiv = document.createElement('div');
+      userMessageDiv.className = 'hana-chat-message user-message';
+      userMessageDiv.textContent = prompt;
+      responseRef.current.appendChild(userMessageDiv);
+      
+      // Scroll to bottom
+      responseRef.current.scrollTop = responseRef.current.scrollHeight;
+      
+      // Save conversation state after adding user message
+      saveConversationState();
+    }
+    
+    try {
+      setIsStreaming(true);
+      
+      // Build the final prompt with chat context for follow-up questions
+      const chatContext = getChatContext();
+      const finalPrompt = chatContext ? `${chatContext}${prompt}` : prompt;
+      
+      // Get current page content from scraper
+      const currentPageContent = getPageContent ? getPageContent() : pageContent;
+      
+      const result = await BackgroundCommunicator.queryAIStreaming({
+        prompt: finalPrompt,
+        provider: settings.selectedProvider,
+        model: settings.qualityPreference,
+        pageContent: currentPageContent
+      });
+      
+      if (!result.received) {
+        setError('Failed to start streaming request');
+        setIsLoading(false);
+        setIsStreaming(false);
+      }
+    } catch (e: any) {
+      setError(e.message || 'An error occurred while processing your request');
+      setIsLoading(false);
+      setIsStreaming(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -255,7 +357,7 @@ const Overlay: React.FC<OverlayProps> = ({
     
     if (!prompt?.trim()) return;
     
-    await makeRequest(prompt, pageContent, settings);
+    await handleRequest(prompt);
     
     // Clear input
     if (inputRef.current) {
@@ -263,10 +365,14 @@ const Overlay: React.FC<OverlayProps> = ({
     }
   };
 
+  const hasMessages = responseRef.current?.children.length ? responseRef.current.children.length > 0 : false;
+  const inputPlaceholder = mode === 'chat' && hasMessages ? 'Ask a follow-up...' : 'Ask about this page...';
+  
+  // In summary mode, always show container when there's content, loading, or error
+  // In chat mode, show container when there are messages, loading, or error
+  const shouldShowContainer = mode === 'summary' ? (hasMessages || isLoading || error || isStreaming) : (hasMessages || isLoading || error);
+  
 
-
-  const isShowingResponse = response || isLoading || error;
-  const hasMessages = mode === 'chat' && isShowingResponse;
 
   return (
     <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 10000000000 }}>
@@ -291,28 +397,19 @@ const Overlay: React.FC<OverlayProps> = ({
           </div>
         )}
 
-        {/* Response container - shown when there's a response, loading, or error */}
-        <div 
-          className="hana-response-container"
-          style={{ display: isShowingResponse ? 'block' : 'none' }}
-        >
-          {isLoading && (
-            <div className="hana-loading">
-              <div className="hana-loading-dots">
-                {isStreaming ? 'Streaming response...' : 'Thinking...'}
-              </div>
-            </div>
-          )}
-          
-          {error && (
+                 {/* Single response container - handles both chat history and summary */}
+         <div 
+           ref={responseRef}
+           className="hana-response-container"
+           style={{ 
+             display: shouldShowContainer ? 'block' : 'none',
+             maxHeight: mode === 'chat' ? '305px' : 'auto',
+             overflowY: mode === 'chat' ? 'auto' : 'visible'
+           }}
+                  >
+           {error && (
             <div className="hana-error">
               {error}
-            </div>
-          )}
-          
-          {response && (
-            <div className={`hana-streaming-response ${!isStreaming ? 'done' : ''}`}>
-              {response}
             </div>
           )}
         </div>
@@ -324,7 +421,7 @@ const Overlay: React.FC<OverlayProps> = ({
               ref={inputRef}
               name="query"
               type="text"
-              placeholder="Ask about this page..."
+              placeholder={inputPlaceholder}
               className="hana-input-field"
               disabled={isLoading}
             />
