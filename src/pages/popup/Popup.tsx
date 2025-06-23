@@ -6,7 +6,7 @@ import type { AIProvider } from '../../lib/types';
 const Popup: React.FC = () => {
   const [settings, setSettings] = useState<SettingsData>({
     selectedProvider: 'mistral',
-    qualityPreference: 'balanced',
+    qualityPreference: 'fast',
     responseLanguage: 'english',
     darkMode: false,
     mistralApiKey: '',
@@ -104,9 +104,8 @@ const Popup: React.FC = () => {
   };
 
   const qualityInfo = {
-    fast: { name: 'Fast', icon: '⚡', description: 'Quick responses' },
-    balanced: { name: 'Balanced', icon: '⚖️', description: 'Good balance' },
-    accurate: { name: 'Accurate', icon: '🎯', description: 'Best quality' }
+    fast: { name: 'Fast', icon: '⚡', description: 'Optimized for speed' },
+    accurate: { name: 'Accurate', icon: '🎯', description: 'Optimized for quality' }
   };
 
   if (loading) {

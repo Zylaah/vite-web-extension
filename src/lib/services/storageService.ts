@@ -41,7 +41,7 @@ export const StorageService = {
       
       return {
         selectedProvider: result.selectedProvider || 'mistral',
-        qualityPreference: result.qualityPreference || 'balanced',
+        qualityPreference: result.qualityPreference || 'fast',
         responseLanguage: result.responseLanguage || 'english',
         darkMode: result.darkMode !== undefined ? result.darkMode : window.matchMedia('(prefers-color-scheme: dark)').matches,
         mistralApiKey: result.mistralApiKey || '',
@@ -53,7 +53,7 @@ export const StorageService = {
       console.error('Error getting settings:', error);
       return {
         selectedProvider: 'mistral' as AIProvider,
-        qualityPreference: 'balanced',
+        qualityPreference: 'fast',
         responseLanguage: 'english' as const,
         darkMode: window.matchMedia('(prefers-color-scheme: dark)').matches,
         mistralApiKey: '',
