@@ -110,9 +110,12 @@ const Overlay: React.FC<OverlayProps> = ({
       onModeChange(mode);
     }
     
-    // Clear content when switching modes first
+    // Clear content when switching modes first - but only when actually switching modes
     if (responseRef.current) {
-      responseRef.current.innerHTML = '';
+      // Only clear if we're switching to summary mode, not when just initializing chat mode
+      if (mode === 'summary') {
+        responseRef.current.innerHTML = '';
+      }
     }
     setError(null);
     setIsLoading(false);
@@ -125,11 +128,32 @@ const Overlay: React.FC<OverlayProps> = ({
       }, 100);
     }
     
-    // Auto-focus input when switching to chat mode
-    if (mode === 'chat' && inputRef.current) {
-      inputRef.current.focus();
+    // Auto-focus input when switching to chat mode and restore conversation
+    if (mode === 'chat') {
+      if (inputRef.current) {
+        inputRef.current.focus();
+      }
+      
+      // Restore conversation in chat mode after a short delay
+      if (existingConversation && existingConversation.messages && existingConversation.messages.length > 0) {
+        setTimeout(() => {
+          if (responseRef.current && responseRef.current.children.length === 0) {
+            // Restore messages to DOM
+            existingConversation.messages.forEach((msg: any) => {
+              const messageDiv = document.createElement('div');
+              messageDiv.className = `hana-chat-message ${msg.role === 'user' ? 'user-message' : 'ai-message'}`;
+              messageDiv.textContent = msg.content;
+              responseRef.current!.appendChild(messageDiv);
+            });
+            
+            // Show container and scroll to bottom
+            responseRef.current.style.display = 'block';
+            responseRef.current.scrollTop = responseRef.current.scrollHeight;
+          }
+        }, 150);
+      }
     }
-  }, [mode, settings.selectedProvider, settings.qualityPreference, pageContent, onModeChange]);
+  }, [mode, settings.selectedProvider, settings.qualityPreference, pageContent, onModeChange, existingConversation]);
 
   // Event handling
   useEffect(() => {
