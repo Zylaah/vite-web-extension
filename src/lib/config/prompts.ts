@@ -5,10 +5,28 @@
 /**
  * Creates a system prompt for answering questions about a page
  * @param content - The page content
+ * @param language - The response language ('english' or 'french')
  * @returns The system prompt
  */
-export function createQuestionPrompt(content: string): string {
-  return `You are a helpful AI assistant. Answer the user's question based on the following webpage content. Be concise and accurate. If the answer is not in the content, say so.
+export function createQuestionPrompt(content: string, language: 'english' | 'french' = 'english'): string {
+  const languageInstructions = language === 'french' 
+    ? `Vous êtes un assistant IA utile. Répondez à la question de l'utilisateur en vous basant sur le contenu de la page web suivante. Soyez concis et précis. Si la réponse ne se trouve pas dans le contenu, dites-le.
+
+EXIGENCES DE FORMATAGE:
+- Utilisez un formatage markdown approprié pour une meilleure lisibilité
+- Formatez les URLs comme des liens markdown: [Texte du lien](https://example.com)
+- Utilisez **gras** pour l'emphase et *italique* quand approprié
+- Utilisez des puces ou des listes numérotées pour lister les éléments
+- Utilisez des blocs de code (\`\`\`) pour les extraits de code
+- Utilisez du code en ligne (\`code\`) pour les termes techniques
+- Utilisez > des citations pour les citations importantes ou les points saillants
+- Utilisez ## des titres pour structurer les réponses plus longues
+
+CONTENU DE LA PAGE WEB:
+${content}
+
+Répondez à la question de l'utilisateur en vous basant uniquement sur les informations fournies ci-dessus en utilisant un formatage markdown approprié.`
+    : `You are a helpful AI assistant. Answer the user's question based on the following webpage content. Be concise and accurate. If the answer is not in the content, say so.
 
 FORMATTING REQUIREMENTS:
 - Use proper markdown formatting for better readability
@@ -24,15 +42,35 @@ WEBPAGE CONTENT:
 ${content}
 
 Answer the user's question based only on the information provided above using proper markdown formatting.`;
+
+  return languageInstructions;
 }
 
 /**
  * Creates a system prompt for summarizing a page (optimized for speed and conciseness)
  * @param content - The page content
+ * @param language - The response language ('english' or 'french')
  * @returns The system prompt
  */
-export function createSummaryPrompt(content: string): string {
-  return `You are a helpful AI assistant. Summarize the following webpage content in a SHORT and CONCISE way. Focus ONLY on the 2-3 most important points.
+export function createSummaryPrompt(content: string, language: 'english' | 'french' = 'english'): string {
+  const languageInstructions = language === 'french'
+    ? `Vous êtes un assistant IA utile. Résumez le contenu de la page web suivante de manière COURTE et CONCISE. Concentrez-vous UNIQUEMENT sur les 2-3 points les plus importants.
+
+EXIGENCES:
+- Utilisez des puces (-) pour chaque point clé
+- Maximum 3 puces
+- Chaque puce doit faire 1-2 phrases maximum
+- Pas de texte d'introduction, commencez directement par les puces
+- Soyez factuel et objectif
+- Utilisez **gras** pour les termes ou concepts clés
+- N'utilisez jamais le formatage markdown pour les puces
+- Formatez les URLs comme des liens markdown: [Texte du lien](https://example.com)
+
+CONTENU DE LA PAGE WEB:
+${content}
+
+Fournissez UNIQUEMENT le résumé en puces du contenu de la page web ci-dessus.`
+    : `You are a helpful AI assistant. Summarize the following webpage content in a SHORT and CONCISE way. Focus ONLY on the 2-3 most important points.
 
 REQUIREMENTS:
 - Use bullet points (-) for each key point
@@ -48,6 +86,8 @@ WEBPAGE CONTENT:
 ${content}
 
 Provide ONLY the bullet points summary of the webpage content above.`;
+
+  return languageInstructions;
 }
 
 /**

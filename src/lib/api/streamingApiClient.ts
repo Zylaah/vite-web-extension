@@ -14,6 +14,7 @@ export abstract class StreamingApiClient extends BaseApiClient {
    * @param content - The page content
    * @param model - The model to use
    * @param isSummary - Whether this is a summary request
+   * @param language - The response language
    * @param onChunk - Callback for each streaming chunk
    * @returns Promise with the final response
    */
@@ -22,6 +23,7 @@ export abstract class StreamingApiClient extends BaseApiClient {
     content: string, 
     model?: string, 
     isSummary?: boolean,
+    language?: 'english' | 'french',
     onChunk?: (chunk: StreamChunk) => void
   ): Promise<AIResponse>;
   

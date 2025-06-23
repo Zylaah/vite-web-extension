@@ -18,12 +18,13 @@ export class OpenAIApiClient extends BaseApiClient {
    * @param content - The page content
    * @param model - The model to use (defaults to gpt-4-turbo)
    * @param isSummary - Whether this is a summary request
+   * @param language - The response language
    * @returns Promise with the API response
    */
-  async call(prompt: string, content: string, model = 'gpt-4-turbo', isSummary = false): Promise<AIResponse> {
+  async call(prompt: string, content: string, model = 'gpt-4-turbo', isSummary = false, language: 'english' | 'french' = 'english'): Promise<AIResponse> {
     try {
       const apiKey = await this.getApiKey();
-      const systemPrompt = this.prepareSystemPrompt(content, isSummary);
+      const systemPrompt = this.prepareSystemPrompt(content, isSummary, language);
       
       // Prepare the API request
       const response = await fetch('https://api.openai.com/v1/chat/completions', {

@@ -10,6 +10,7 @@ import type { AIProvider } from '../types';
 export interface SettingsData {
   selectedProvider: AIProvider;
   qualityPreference: string;
+  responseLanguage: 'english' | 'french';
   mistralApiKey?: string;
   openaiApiKey?: string;
   anthropicApiKey?: string;
@@ -29,6 +30,7 @@ export const StorageService = {
       const result = await browser.storage.local.get([
         'selectedProvider',
         'qualityPreference',
+        'responseLanguage',
         'mistralApiKey',
         'openaiApiKey',
         'anthropicApiKey',
@@ -38,6 +40,7 @@ export const StorageService = {
       return {
         selectedProvider: result.selectedProvider || 'mistral',
         qualityPreference: result.qualityPreference || 'balanced',
+        responseLanguage: result.responseLanguage || 'english',
         mistralApiKey: result.mistralApiKey || '',
         openaiApiKey: result.openaiApiKey || '',
         anthropicApiKey: result.anthropicApiKey || '',
@@ -48,6 +51,7 @@ export const StorageService = {
       return {
         selectedProvider: 'mistral' as AIProvider,
         qualityPreference: 'balanced',
+        responseLanguage: 'english' as const,
         mistralApiKey: '',
         openaiApiKey: '',
         anthropicApiKey: '',

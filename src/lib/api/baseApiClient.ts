@@ -39,20 +39,22 @@ export abstract class BaseApiClient {
    * @param content - The page content
    * @param model - The model to use
    * @param isSummary - Whether this is a summary request
+   * @param language - The response language
    * @returns Promise with the API response
    */
-  abstract call(prompt: string, content: string, model?: string, isSummary?: boolean): Promise<any>;
+  abstract call(prompt: string, content: string, model?: string, isSummary?: boolean, language?: 'english' | 'french'): Promise<any>;
   
   /**
    * Prepares the system prompt
    * @param content - The page content
    * @param isSummary - Whether this is a summary request
+   * @param language - The response language
    * @returns The system prompt
    */
-  protected prepareSystemPrompt(content: string, isSummary = false): string {
+  protected prepareSystemPrompt(content: string, isSummary = false, language: 'english' | 'french' = 'english'): string {
     return isSummary 
-      ? createSummaryPrompt(content)
-      : createQuestionPrompt(content);
+      ? createSummaryPrompt(content, language)
+      : createQuestionPrompt(content, language);
   }
   
   /**

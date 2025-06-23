@@ -4,6 +4,7 @@
 import browser from 'webextension-polyfill';
 import { PrivacyManager } from '../../lib/services/privacyManager';
 import { RateLimiter } from '../../lib/utils/rateLimiter';
+import { StorageService } from '../../lib/services/storageService';
 
 import { getModelName } from '../../lib/config/models';
 import { getApiClient } from '../../lib/api/apiFactory';
@@ -70,15 +71,18 @@ browser.runtime.onMessage.addListener((message: any, sender, sendResponse) => {
         }
         
         try {
+          // Get settings for language preference
+          const settings = await StorageService.getSettings();
+          
           // Get the appropriate API client
           const apiClient = getApiClient(message.provider);
           
           // Call the API
           const model = getModelName(message.provider, message.model);
           const isSummary = message.prompt.toLowerCase().includes('summarize');
-          console.log(`Calling ${message.provider} API with model ${model}, isSummary: ${isSummary}`);
+          console.log(`Calling ${message.provider} API with model ${model}, isSummary: ${isSummary}, language: ${settings.responseLanguage}`);
           
-          const response = await apiClient.call(message.prompt, message.pageContent, model, isSummary);
+          const response = await apiClient.call(message.prompt, message.pageContent, model, isSummary, settings.responseLanguage);
           sendResponse(response);
         } catch (error: any) {
           console.error('Error calling API:', error);
@@ -129,6 +133,9 @@ browser.runtime.onMessage.addListener((message: any, sender, sendResponse) => {
           console.log('📡 Hana Background: Sending acknowledgment at', Date.now() - streamingStartTime, 'ms');
           sendResponse({ received: true });
           
+          // Get settings for language preference
+          const settings = await StorageService.getSettings();
+          
           // Get the appropriate API client
           console.log('🔧 Hana Background: Getting API client at', Date.now() - streamingStartTime, 'ms');
           const apiClient = getApiClient(message.provider);
@@ -137,7 +144,7 @@ browser.runtime.onMessage.addListener((message: any, sender, sendResponse) => {
           if ('callStreaming' in apiClient) {
             const model = getModelName(message.provider, message.model);
             const isSummary = message.prompt.toLowerCase().includes('summarize');
-            console.log(`🤖 Hana Background: Starting streaming call to ${message.provider} API with model ${model} at ${Date.now() - streamingStartTime}ms`);
+            console.log(`🤖 Hana Background: Starting streaming call to ${message.provider} API with model ${model}, language: ${settings.responseLanguage} at ${Date.now() - streamingStartTime}ms`);
             
             // Start streaming
             await (apiClient as any).callStreaming(
@@ -145,6 +152,7 @@ browser.runtime.onMessage.addListener((message: any, sender, sendResponse) => {
               message.pageContent, 
               model, 
               isSummary,
+              settings.responseLanguage,
               (chunk: any) => {
                 // Send chunk to content script
                 browser.tabs.sendMessage(sender.tab?.id || 0, {
@@ -165,7 +173,7 @@ browser.runtime.onMessage.addListener((message: any, sender, sendResponse) => {
             console.log('⚠️ Hana Background: Using fallback non-streaming call');
             const model = getModelName(message.provider, message.model);
             const isSummary = message.prompt.toLowerCase().includes('summarize');
-            const response = await apiClient.call(message.prompt, message.pageContent, model, isSummary);
+            const response = await apiClient.call(message.prompt, message.pageContent, model, isSummary, settings.responseLanguage);
             
             browser.tabs.sendMessage(sender.tab?.id || 0, {
               action: 'streaming-complete',

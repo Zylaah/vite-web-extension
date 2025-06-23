@@ -18,12 +18,13 @@ export class MistralApiClient extends StreamingApiClient {
    * @param content - The page content
    * @param model - The model to use (defaults to mistral-large-latest)
    * @param isSummary - Whether this is a summary request
+   * @param language - The response language
    * @returns Promise with the API response
    */
-  async call(prompt: string, content: string, model = 'mistral-large-latest', isSummary = false): Promise<AIResponse> {
+  async call(prompt: string, content: string, model = 'mistral-large-latest', isSummary = false, language: 'english' | 'french' = 'english'): Promise<AIResponse> {
     try {
       const apiKey = await this.getApiKey();
-      const systemPrompt = this.prepareSystemPrompt(content, isSummary);
+      const systemPrompt = this.prepareSystemPrompt(content, isSummary, language);
       
       // Prepare the API request
       const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
@@ -69,6 +70,7 @@ export class MistralApiClient extends StreamingApiClient {
    * @param content - The page content
    * @param model - The model to use (defaults to mistral-large-latest)
    * @param isSummary - Whether this is a summary request
+   * @param language - The response language
    * @param onChunk - Callback for each streaming chunk
    * @returns Promise with the AI response
    */
@@ -77,11 +79,12 @@ export class MistralApiClient extends StreamingApiClient {
     content: string, 
     model = 'mistral-large-latest', 
     isSummary = false,
+    language: 'english' | 'french' = 'english',
     onChunk?: (chunk: StreamChunk) => void
   ): Promise<AIResponse> {
     try {
       const apiKey = await this.getApiKey();
-      const systemPrompt = this.prepareSystemPrompt(content, isSummary);
+      const systemPrompt = this.prepareSystemPrompt(content, isSummary, language);
       
       // Prepare the API request with streaming
       const response = await fetch('https://api.mistral.ai/v1/chat/completions', {

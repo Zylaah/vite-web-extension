@@ -20,10 +20,10 @@ export class AnthropicApiClient extends BaseApiClient {
    * @param isSummary - Whether this is a summary request
    * @returns Promise with the API response
    */
-  async call(prompt: string, content: string, model = 'claude-3-opus-20240229', isSummary = false): Promise<AIResponse> {
+  async call(prompt: string, content: string, model = 'claude-3-opus-20240229', isSummary = false, language: 'english' | 'french' = 'english'): Promise<AIResponse> {
     try {
       const apiKey = await this.getApiKey();
-      const systemPrompt = this.prepareSystemPrompt(content, isSummary);
+      const systemPrompt = this.prepareSystemPrompt(content, isSummary, language);
       
       // Prepare the API request
       const response = await fetch('https://api.anthropic.com/v1/messages', {

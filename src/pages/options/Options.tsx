@@ -12,6 +12,7 @@ const Options: React.FC = () => {
   const [settings, setSettings] = useState<SettingsData>({
     selectedProvider: 'mistral',
     qualityPreference: 'balanced',
+    responseLanguage: 'english',
     mistralApiKey: '',
     openaiApiKey: '',
     anthropicApiKey: '',
@@ -75,6 +76,10 @@ const Options: React.FC = () => {
   
   const handleQualityChange = (quality: string) => {
     setSettings(prev => ({ ...prev, qualityPreference: quality }));
+  };
+
+  const handleLanguageChange = (language: 'english' | 'french') => {
+    setSettings(prev => ({ ...prev, responseLanguage: language }));
   };
   
   const handleDarkModeChange = async (newDarkMode: boolean) => {
@@ -650,6 +655,36 @@ const Options: React.FC = () => {
                       >
                         <option value="fast">Fast (Optimized for speed)</option>
                         <option value="accurate">Accurate (Optimized for quality)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        marginBottom: '12px',
+                        fontWeight: '600',
+                        color: 'var(--text-color)',
+                        fontSize: '18px'
+                      }}>
+                        Response Language
+                      </label>
+                      <select
+                        value={settings.responseLanguage}
+                        onChange={(e) => handleLanguageChange(e.target.value as 'english' | 'french')}
+                        style={{
+                          width: '100%',
+                          padding: '16px 20px',
+                          border: '1px solid var(--border-color)',
+                          borderRadius: '12px',
+                          fontSize: '16px',
+                          backgroundColor: 'var(--bg-color)',
+                          color: 'var(--text-color)',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        <option value="english">🇺🇸 English</option>
+                        <option value="french">🇫🇷 Français</option>
                       </select>
                     </div>
                   </div>
