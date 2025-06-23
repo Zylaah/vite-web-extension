@@ -195,7 +195,6 @@
   align-items: center !important;
   padding: 0 10px !important;
   background: transparent !important;
-  border-radius: 10px 10px 0 0 !important;
 }
 
 .hana-summary-title {
@@ -203,6 +202,7 @@
   font-size: 14px !important;
   color: var(--hana-text-color) !important;
   opacity: 0.9 !important;
+  margin-bottom: 0 !important;
 }
 
 .hana-close-button {
@@ -227,7 +227,7 @@
 
 /* Response container */
 .hana-response-container {
-  padding: 5px !important;
+  padding: 5px 5px 10px 5px !important;
   background-color: transparent !important;
   border: none !important;
   border-radius: 5px !important;
@@ -240,7 +240,6 @@
   display: none !important;
   will-change: contents !important;
   scroll-behavior: smooth !important;
-  margin-bottom: 5px !important;
   padding-right: 10px !important;
   flex-grow: 1 !important;
 }
@@ -462,8 +461,8 @@
   font-family: inherit !important;
 }
 
-/* Streaming cursor */
-.hana-streaming-response::after {
+/* Streaming cursor - only for non-markdown content */
+.hana-streaming-response:not(.has-markdown)::after {
   content: "|" !important;
   position: relative !important;
   display: inline-block !important;
@@ -536,9 +535,203 @@
   opacity: 0.7 !important;
 }
 
-.hana-close-button-chat:hover {
-  opacity: 1 !important;
-}
+  .hana-close-button-chat:hover {
+    opacity: 1 !important;
+  }
+
+  /* Markdown content styling */
+  .markdown-content {
+    line-height: 1.6 !important;
+    color: var(--hana-text-color) !important;
+  }
+
+  .markdown-content h1,
+  .markdown-content h2,
+  .markdown-content h3,
+  .markdown-content h4,
+  .markdown-content h5,
+  .markdown-content h6 {
+    color: var(--hana-text-color) !important;
+    font-weight: 600 !important;
+    margin-top: 1em !important;
+    margin-bottom: 0.5em !important;
+  }
+
+  .markdown-content h1:first-child,
+  .markdown-content h2:first-child,
+  .markdown-content h3:first-child,
+  .markdown-content h4:first-child,
+  .markdown-content h5:first-child,
+  .markdown-content h6:first-child {
+    margin-top: 0 !important;
+  }
+
+  .markdown-content p {
+    margin-bottom: 1em !important;
+    color: var(--hana-text-color) !important;
+    margin-top: 0 !important;
+  }
+
+  .markdown-content p:last-child {
+    margin-bottom: 0 !important;
+  }
+
+  .markdown-content ul,
+  .markdown-content ol {
+    margin: 0 0 1em 0 !important;
+    padding-left: 1.5em !important;
+  }
+
+  .markdown-content li {
+    margin-bottom: 0.5em !important;
+    color: var(--hana-text-color) !important;
+  }
+
+  .markdown-content ul li {
+    margin-bottom: 0 !important;
+  }
+
+  .markdown-content code {
+    background-color: rgba(128, 128, 128, 0.1) !important;
+    padding: 0.2em 0.4em !important;
+    border-radius: 3px !important;
+    font-size: 0.9em !important;
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace !important;
+  }
+
+  .markdown-content pre {
+    background-color: rgba(128, 128, 128, 0.1) !important;
+    padding: 1em !important;
+    border-radius: 6px !important;
+    overflow-x: auto !important;
+    margin: 1em 0 !important;
+  }
+
+  .markdown-content pre code {
+    background-color: transparent !important;
+    padding: 0 !important;
+  }
+
+  .markdown-content blockquote {
+    border-left: 3px solid var(--hana-accent-color) !important;
+    padding-left: 1em !important;
+    margin: 1em 0 !important;
+    font-style: italic !important;
+    opacity: 0.8 !important;
+  }
+
+  .markdown-content a {
+    color: var(--hana-accent-color) !important;
+    text-decoration: underline !important;
+    text-decoration-color: transparent !important;
+    transition: all 0.2s ease !important;
+  }
+
+  .markdown-content a:hover {
+    text-decoration-color: var(--hana-accent-color) !important;
+    opacity: 0.8 !important;
+  }
+
+  .markdown-content table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    margin: 1em 0 !important;
+    background-color: transparent !important;
+  }
+
+  .markdown-content th,
+  .markdown-content td {
+    border: 1px solid rgba(128, 128, 128, 0.3) !important;
+    padding: 0.5em !important;
+    text-align: left !important;
+  }
+
+  .markdown-content th {
+    background-color: rgba(128, 128, 128, 0.1) !important;
+    font-weight: 600 !important;
+  }
+
+  .markdown-content hr {
+    border: none !important;
+    height: 1px !important;
+    background: linear-gradient(to right, transparent, rgba(128, 128, 128, 0.3), transparent) !important;
+    margin: 2em 0 !important;
+  }
+
+  /* Math content styling */
+  .markdown-content .math-inline {
+    background-color: rgba(59, 130, 246, 0.1) !important;
+    color: rgb(59, 130, 246) !important;
+    padding: 0.2em 0.5em !important;
+    border-radius: 4px !important;
+    border: 1px solid rgba(59, 130, 246, 0.2) !important;
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace !important;
+  }
+
+  .markdown-content .math-block {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(99, 102, 241, 0.1)) !important;
+    border: 1px solid rgba(59, 130, 246, 0.2) !important;
+    border-radius: 8px !important;
+    padding: 1em !important;
+    margin: 1em 0 !important;
+    text-align: center !important;
+  }
+
+  .markdown-content .math-block code {
+    background: white !important;
+    color: var(--hana-text-color) !important;
+    padding: 0.75em 1em !important;
+    border-radius: 6px !important;
+    border: 1px solid rgba(59, 130, 246, 0.3) !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+  }
+
+  /* Dark mode adjustments */
+  :host(.dark-mode) .markdown-content .math-block code {
+    background: rgba(31, 41, 55, 1) !important;
+    border-color: rgba(59, 130, 246, 0.4) !important;
+  }
+
+  /* Markdown content container in overlay */
+  .hana-markdown-content {
+    width: 100% !important;
+    color: inherit !important;
+    font-family: inherit !important;
+    font-size: inherit !important;
+    line-height: inherit !important;
+  }
+
+  /* Ensure markdown content inherits proper styling in streaming responses */
+  .hana-streaming-response .hana-markdown-content,
+  .hana-chat-message .hana-markdown-content {
+    color: var(--hana-text-color) !important;
+  }
+
+  /* Dark mode text color inheritance */
+  :host(.dark-mode) .hana-streaming-response .hana-markdown-content,
+  :host(.dark-mode) .hana-chat-message .hana-markdown-content {
+    color: #e0e0e0 !important;
+  }
+
+  /* Streaming cursor for markdown content - managed at container level */
+  .hana-streaming-response.has-markdown::after {
+    content: "|" !important;
+    position: relative !important;
+    display: inline !important;
+    color: var(--hana-text-color) !important;
+    animation: hana-cursor-blink 1s step-start infinite !important;
+    margin-left: 2px !important;
+    font-weight: bold !important;
+  }
+
+  .hana-streaming-response.done.has-markdown::after {
+    display: none !important;
+  }
+
+  /* Dark mode cursor */
+  :host(.dark-mode) .hana-streaming-response.has-markdown::after {
+    color: #e0e0e0 !important;
+  }
 
 .hana-close-button-chat:hover svg {
   fill: var(--hana-primary-light) !important;

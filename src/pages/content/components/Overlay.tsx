@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createRoot } from 'react-dom/client';
 import browser from 'webextension-polyfill';
 import { BackgroundCommunicator } from '../../../lib/services/backgroundCommunicator';
+import MessageRenderer from './MessageRenderer';
 
 // Types for better type safety
 type OverlayMode = 'chat' | 'summary';
@@ -46,6 +48,9 @@ const Overlay: React.FC<OverlayProps> = ({
     qualityPreference: 'quality'
   });
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [streamingContent, setStreamingContent] = useState<string>('');
+  const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
+  const streamingRootRef = useRef<any>(null);
   
   // Load settings and restore conversation
   useEffect(() => {
@@ -75,7 +80,22 @@ const Overlay: React.FC<OverlayProps> = ({
           existingConversation.messages.forEach((msg: any) => {
             const messageDiv = document.createElement('div');
             messageDiv.className = `hana-chat-message ${msg.role === 'user' ? 'user-message' : 'ai-message'}`;
-            messageDiv.textContent = msg.content;
+            
+            if (msg.role === 'user') {
+              // User messages remain as plain text
+              messageDiv.textContent = msg.content;
+            } else {
+              // AI messages should be rendered as markdown
+              const markdownContainer = document.createElement('div');
+              markdownContainer.className = 'hana-markdown-content';
+              
+              // Create a React root and render the markdown
+              const root = createRoot(markdownContainer);
+              root.render(React.createElement(MessageRenderer, { content: msg.content }));
+              
+              messageDiv.appendChild(markdownContainer);
+            }
+            
             responseRef.current!.appendChild(messageDiv);
           });
           
@@ -98,7 +118,22 @@ const Overlay: React.FC<OverlayProps> = ({
       existingConversation.messages.forEach((msg: any) => {
         const messageDiv = document.createElement('div');
         messageDiv.className = `hana-chat-message ${msg.role === 'user' ? 'user-message' : 'ai-message'}`;
-        messageDiv.textContent = msg.content;
+        
+        if (msg.role === 'user') {
+          // User messages remain as plain text
+          messageDiv.textContent = msg.content;
+        } else {
+          // AI messages should be rendered as markdown
+          const markdownContainer = document.createElement('div');
+          markdownContainer.className = 'hana-markdown-content';
+          
+          // Create a React root and render the markdown
+          const root = createRoot(markdownContainer);
+          root.render(React.createElement(MessageRenderer, { content: msg.content }));
+          
+          messageDiv.appendChild(markdownContainer);
+        }
+        
         responseRef.current!.appendChild(messageDiv);
       });
       
@@ -146,7 +181,22 @@ const Overlay: React.FC<OverlayProps> = ({
             existingConversation.messages.forEach((msg: any) => {
               const messageDiv = document.createElement('div');
               messageDiv.className = `hana-chat-message ${msg.role === 'user' ? 'user-message' : 'ai-message'}`;
-              messageDiv.textContent = msg.content;
+              
+              if (msg.role === 'user') {
+                // User messages remain as plain text
+                messageDiv.textContent = msg.content;
+              } else {
+                // AI messages should be rendered as markdown
+                const markdownContainer = document.createElement('div');
+                markdownContainer.className = 'hana-markdown-content';
+                
+                // Create a React root and render the markdown
+                const root = createRoot(markdownContainer);
+                root.render(React.createElement(MessageRenderer, { content: msg.content }));
+                
+                messageDiv.appendChild(markdownContainer);
+              }
+              
               responseRef.current!.appendChild(messageDiv);
             });
             
@@ -234,31 +284,75 @@ const Overlay: React.FC<OverlayProps> = ({
           }
           
           if (!lastStreamingElement) {
-            // Create new streaming element
+            // Create new streaming element with React component
+            const messageId = `streaming-${Date.now()}`;
+            setStreamingMessageId(messageId);
+            setStreamingContent(message.chunk.text);
+            
             if (mode === 'chat') {
               const aiMessageDiv = document.createElement('div');
               aiMessageDiv.className = 'hana-chat-message ai-message';
-              aiMessageDiv.innerHTML = '<div class="hana-streaming-response">' + message.chunk.text + '</div>';
+              aiMessageDiv.id = messageId;
+              
+                          // Create a React container for the streaming content
+            const reactContainer = document.createElement('div');
+            reactContainer.className = 'hana-streaming-response has-markdown';
+            aiMessageDiv.appendChild(reactContainer);
+            
+            // Create and store the React root
+            const root = createRoot(reactContainer);
+            streamingRootRef.current = root;
+            root.render(React.createElement(MessageRenderer, { 
+              content: message.chunk.text
+            }));
+              
               responseRef.current.appendChild(aiMessageDiv);
-              lastStreamingElement = aiMessageDiv.querySelector('.hana-streaming-response');
+              lastStreamingElement = reactContainer;
             } else {
-              // In summary mode, create direct streaming response
-              const streamingDiv = document.createElement('div');
-              streamingDiv.className = 'hana-streaming-response';
-              streamingDiv.textContent = message.chunk.text;
+                          // In summary mode, create direct streaming response
+            const streamingDiv = document.createElement('div');
+            streamingDiv.className = 'hana-streaming-response has-markdown';
+            streamingDiv.id = messageId;
+            
+            // Create and store the React root
+            const root = createRoot(streamingDiv);
+            streamingRootRef.current = root;
+            root.render(React.createElement(MessageRenderer, { 
+              content: message.chunk.text
+            }));
+              
               responseRef.current.appendChild(streamingDiv);
               lastStreamingElement = streamingDiv;
             }
             setIsLoading(false);
           } else {
-            // Update existing streaming message
-            lastStreamingElement.textContent = message.chunk.text;
+            // Update existing streaming message by re-rendering the React component
+            setStreamingContent(message.chunk.text);
+            
+            // Reuse the existing React root for better performance
+            if (streamingRootRef.current) {
+              streamingRootRef.current.render(React.createElement(MessageRenderer, { 
+                content: message.chunk.text
+              }));
+            }
           }
           
           // Check if this is the final chunk and mark as done to remove cursor
           if (message.chunk.isDone && lastStreamingElement) {
             lastStreamingElement.classList.add('done');
+            
+            // Final render - cursor will be hidden by CSS
+            if (streamingRootRef.current) {
+              streamingRootRef.current.render(React.createElement(MessageRenderer, { 
+                content: message.chunk.text
+              }));
+            }
+            
+            // Clean up streaming state
             setIsStreaming(false);
+            setStreamingContent('');
+            setStreamingMessageId(null);
+            streamingRootRef.current = null;
             saveConversationState();
           }
           
@@ -276,6 +370,12 @@ const Overlay: React.FC<OverlayProps> = ({
           const lastStreamingResponse = responseRef.current.querySelector('.hana-streaming-response:last-child');
           if (lastStreamingResponse) {
             lastStreamingResponse.classList.add('done');
+            
+            // Final render is already handled in the chunk processing
+            // Just clean up streaming state
+            setStreamingContent('');
+            setStreamingMessageId(null);
+            streamingRootRef.current = null;
           }
           
           // Save conversation state when streaming completes

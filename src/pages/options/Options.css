@@ -1,8 +1,94 @@
-.container {
-  width: 100%;
-  height: 50vh;
-  font-size: 2rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+/* Reset and Modern Options Page Styles */
+body, html {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+.hana-options {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg-color);
+  color: var(--text-color);
+  transition: all 0.3s ease;
+  margin: 0;
+  padding: 0;
+}
+
+/* Smooth transitions for all interactive elements */
+.hana-options button,
+.hana-options input,
+.hana-options select {
+  transition: all 0.2s ease;
+}
+
+/* Focus states for accessibility */
+.hana-options button:focus,
+.hana-options input:focus,
+.hana-options select:focus {
+  outline: 2px solid var(--button-primary);
+  outline-offset: 2px;
+}
+
+/* Hover effects for form elements */
+.hana-options input:hover,
+.hana-options select:hover {
+  border-color: var(--button-primary);
+  box-shadow: 0 0 0 3px rgba(228, 75, 121, 0.1);
+}
+
+/* Dark mode specific adjustments */
+.dark-mode .hana-options input:hover,
+.dark-mode .hana-options select:hover {
+  box-shadow: 0 0 0 3px rgba(170, 105, 196, 0.1);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .hana-options {
+    padding: 20px 16px !important;
+  }
+  
+  .hana-options h1 {
+    font-size: 36px !important;
+  }
+  
+  .hana-options .grid-layout {
+    grid-template-columns: 1fr !important;
+    gap: 20px !important;
+  }
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.hana-options > div {
+  animation: fadeIn 0.6s ease-out;
+}
+
+/* Custom scrollbar for better aesthetics */
+.hana-options::-webkit-scrollbar {
+  width: 8px;
+}
+
+.hana-options::-webkit-scrollbar-track {
+  background: var(--subtle-bg);
+  border-radius: 4px;
+}
+
+.hana-options::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+
+.hana-options::-webkit-scrollbar-thumb:hover {
+  background: var(--button-primary);
 }

@@ -30,6 +30,9 @@ const Options: React.FC = () => {
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [testingCompression, setTestingCompression] = useState(false);
   const [compressionResults, setCompressionResults] = useState<any>(null);
+  const [customShortcut, setCustomShortcut] = useState('Alt+F');
+  const [isRecordingShortcut, setIsRecordingShortcut] = useState(false);
+  const [recordedKeys, setRecordedKeys] = useState<string[]>([]);
   
   // Load settings on mount
   useEffect(() => {
@@ -38,6 +41,12 @@ const Options: React.FC = () => {
         // Load settings (includes API keys now)
         const storedSettings = await StorageService.getSettings();
         setSettings(storedSettings);
+        
+        // Load custom shortcut
+        const result = await browser.storage.sync.get(['customShortcut']);
+        if (result.customShortcut && typeof result.customShortcut === 'string') {
+          setCustomShortcut(result.customShortcut);
+        }
         
         // Check privacy status
         const privacyStatus = await PrivacyManager.getStatus();
@@ -99,6 +108,9 @@ const Options: React.FC = () => {
       // Save all settings including API keys
       await StorageService.saveSettings(settings);
       
+      // Save custom shortcut
+      await browser.storage.sync.set({ customShortcut });
+      
       setSaveMessage('Settings saved successfully!');
       setTimeout(() => setSaveMessage(''), 3000);
     } catch (e) {
@@ -113,6 +125,72 @@ const Options: React.FC = () => {
     browser.tabs.create({ url: browser.runtime.getURL('src/privacy/privacy-policy.html') });
   };
   
+  const startRecordingShortcut = () => {
+    setIsRecordingShortcut(true);
+    setRecordedKeys([]);
+  };
+
+  const handleShortcutKeyDown = (event: KeyboardEvent) => {
+    if (!isRecordingShortcut) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    // Handle Escape to apply or cancel the recorded shortcut
+    if (event.key === 'Escape') {
+      if (recordedKeys.length >= 2) {
+        const newShortcut = recordedKeys.join('+');
+        setCustomShortcut(newShortcut);
+      }
+      // Always stop recording on Escape, whether we apply or cancel
+      setIsRecordingShortcut(false);
+      setRecordedKeys([]);
+      return;
+    }
+
+    // Capture modifier keys and regular keys
+    const modifierKeys = ['Control', 'Alt', 'Shift', 'Meta'];
+    const keys: string[] = [];
+
+    // Add modifier keys
+    if (event.ctrlKey) keys.push('Ctrl');
+    if (event.altKey) keys.push('Alt');
+    if (event.shiftKey) keys.push('Shift');
+    if (event.metaKey) keys.push('Meta');
+
+    // Add the main key (if it's not a modifier itself)
+    if (!modifierKeys.includes(event.key)) {
+      keys.push(event.key.toUpperCase());
+    }
+
+    // Only update if we have at least one modifier + one key
+    if (keys.length >= 2) {
+      setRecordedKeys(keys);
+    }
+  };
+
+  // Add event listener for shortcut recording
+  useEffect(() => {
+    if (isRecordingShortcut) {
+      const handleClickOutside = (event: MouseEvent) => {
+        // Cancel recording if clicking outside the shortcut area
+        const target = event.target as HTMLElement;
+        if (!target.closest('[data-shortcut-recorder]')) {
+          setIsRecordingShortcut(false);
+          setRecordedKeys([]);
+        }
+      };
+
+      document.addEventListener('keydown', handleShortcutKeyDown, true);
+      document.addEventListener('click', handleClickOutside, true);
+      
+      return () => {
+        document.removeEventListener('keydown', handleShortcutKeyDown, true);
+        document.removeEventListener('click', handleClickOutside, true);
+      };
+    }
+  }, [isRecordingShortcut, recordedKeys]);
+
   const testCompression = async () => {
     setTestingCompression(true);
     setCompressionResults(null);
@@ -139,36 +217,39 @@ const Options: React.FC = () => {
     <div 
       className="hana-options"
       style={{
-        maxWidth: '1200px',
-        margin: '0 auto',
-        padding: '40px 20px',
+        width: '100%',
+        minHeight: '100vh',
+        padding: '0',
+        boxSizing: 'border-box',
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
         fontSize: '16px',
         lineHeight: '1.6',
         backgroundColor: 'var(--bg-color)',
         color: 'var(--text-color)',
         transition: 'background-color 0.3s, color 0.3s',
-        minHeight: '100vh',
-        '--bg-color': darkMode ? '#1a1a1a' : '#f5f5f7',
+        '--bg-color': darkMode ? '#0f0f0f' : '#fafafa',
         '--text-color': darkMode ? '#f5f5f7' : '#1d1d1f',
         '--secondary-text': darkMode ? '#a1a1a6' : '#6e6e73',
-        '--container-bg': darkMode ? '#2d2d2d' : '#ffffff',
-        '--border-color': darkMode ? '#424242' : '#d2d2d7',
+        '--container-bg': darkMode ? '#1c1c1e' : '#ffffff',
+        '--border-color': darkMode ? '#2c2c2e' : '#e5e5e7',
         '--button-primary': darkMode ? '#aa69c4' : '#e44b79',
         '--button-primary-hover': darkMode ? '#9e4dbe' : 'rgb(235, 103, 143)',
         '--button-secondary': darkMode ? '#42c268' : '#34a853',
         '--button-secondary-hover': darkMode ? '#35a855' : '#2d9249',
         '--button-text': 'white',
         '--success-color': darkMode ? '#30d158' : '#137333',
-        '--success-bg': darkMode ? '#0e5624' : '#e6f4ea',
+        '--success-bg': darkMode ? '#0e2818' : '#e6f4ea',
         '--error-color': darkMode ? '#ff453a' : '#d93025',
-        '--error-bg': darkMode ? '#551111' : '#fce8e6',
+        '--error-bg': darkMode ? '#2d1b1b' : '#fce8e6',
         '--card-shadow': darkMode 
-          ? '0 4px 20px rgba(0, 0, 0, 0.3)' 
-          : '0 4px 20px rgba(0, 0, 0, 0.08)',
+          ? '0 8px 32px rgba(0, 0, 0, 0.4)' 
+          : '0 8px 32px rgba(0, 0, 0, 0.08)',
         '--hover-shadow': darkMode 
-          ? '0 8px 30px rgba(0, 0, 0, 0.4)' 
-          : '0 8px 30px rgba(0, 0, 0, 0.12)'
+          ? '0 12px 40px rgba(0, 0, 0, 0.5)' 
+          : '0 12px 40px rgba(0, 0, 0, 0.12)',
+        '--subtle-bg': darkMode ? '#2c2c2e' : '#f2f2f7',
+        '--accent-bg': darkMode ? 'rgba(170, 105, 196, 0.1)' : 'rgba(228, 75, 121, 0.05)',
+        '--accent-border': darkMode ? 'rgba(170, 105, 196, 0.3)' : 'rgba(228, 75, 121, 0.2)'
       } as React.CSSProperties}
     >
     
@@ -256,11 +337,11 @@ const Options: React.FC = () => {
           </p>
 
           <div style={{
-            backgroundColor: darkMode ? 'rgba(170, 105, 196, 0.1)' : 'rgba(228, 75, 121, 0.1)',
+            backgroundColor: 'var(--accent-bg)',
             borderRadius: '16px',
             padding: '24px',
             margin: '0 0 32px 0',
-            border: `1px solid ${darkMode ? 'rgba(170, 105, 196, 0.3)' : 'rgba(228, 75, 121, 0.3)'}`
+            border: '1px solid var(--accent-border)'
           }}>
             <p style={{
               fontSize: '16px',
@@ -342,669 +423,1134 @@ const Options: React.FC = () => {
 
     {/* Main Content - only shown when privacy is accepted */}
     {privacyAccepted && (
-      <>
-      {/* Modern Header */}
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center', 
-        marginBottom: '60px',
-        padding: '0 4px'
-      }}>
-        <div>
-          <h1 style={{ 
-            fontSize: '48px', 
-            fontWeight: '700',
-            margin: '0',
-            color: 'var(--text-color)',
-            letterSpacing: '-0.02em'
-          }}>
-            Hana
-          </h1>
-          <p style={{
-            fontSize: '20px',
-            margin: '8px 0 0 0',
-            color: 'var(--secondary-text)',
-            fontWeight: '400'
-          }}>
-            AI Assistant Settings
-          </p>
-        </div>
-        
-        {/* Modern Theme Toggle */}
-        <div 
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            padding: '12px 16px',
-            backgroundColor: 'var(--container-bg)',
-            borderRadius: '16px',
-            border: '1px solid var(--border-color)',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease'
-          }}
-          title="Toggle dark mode"
-          onClick={() => handleDarkModeChange(!darkMode)}
-        >
-          <span style={{
-            fontSize: '16px',
-            color: 'var(--secondary-text)',
-            fontWeight: '500'
-          }}>
-            {darkMode ? 'Dark' : 'Light'}
-          </span>
-          <div style={{
-            width: '44px',
-            height: '24px',
-            backgroundColor: darkMode ? 'var(--button-primary)' : '#e5e5e7',
-            borderRadius: '12px',
-            position: 'relative',
-            transition: 'all 0.3s ease'
-          }}>
-            <div style={{
-              position: 'absolute',
-              top: '2px',
-              left: darkMode ? '22px' : '2px',
-              width: '20px',
-              height: '20px',
-              backgroundColor: 'white',
-              borderRadius: '10px',
-              transition: 'all 0.3s ease',
-              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)'
-            }} />
-          </div>
-        </div>
-      </div>
-
-
-      
-      {/* Modern Tab Navigation */}
       <div style={{
-        display: 'flex',
-        gap: '8px',
-        marginBottom: '40px',
-        backgroundColor: 'var(--container-bg)',
-        padding: '6px',
-        borderRadius: '16px',
-        boxShadow: 'var(--card-shadow)',
-        border: '1px solid var(--border-color)',
-        width: 'fit-content',
-        margin: '0 auto 40px auto'
+        maxWidth: '1400px',
+        margin: '0 auto',
+        padding: '24px',
+        minHeight: 'calc(100vh - 48px)',
+        boxSizing: 'border-box'
       }}>
-        {(['providers', 'settings', 'info', 'developer'] as const).map(tab => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            style={{
-              padding: '12px 24px',
-              cursor: 'pointer',
-              border: 'none',
-              backgroundColor: activeTab === tab ? 'var(--button-primary)' : 'transparent',
-              color: activeTab === tab ? 'white' : 'var(--text-color)',
-              borderRadius: '12px',
-              fontSize: '16px',
-              fontWeight: '600',
-              transition: 'all 0.3s ease',
-              boxShadow: activeTab === tab ? '0 2px 8px rgba(0, 0, 0, 0.15)' : 'none'
-            }}
-          >
-            {tab === 'providers' ? 'AI Providers' : 
-             tab === 'settings' ? 'Preferences' : 
-             tab === 'info' ? 'Information' :
-             'Developer'}
-          </button>
-        ))}
-      </div>
-
-      {/* Providers Tab */}
-      {activeTab === 'providers' && (
-        <div style={{
-          display: 'grid',
-          gap: '32px',
-          maxWidth: '800px',
-          margin: '0 auto'
+        {/* Modern Header */}
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          marginBottom: '48px',
+          padding: '0 8px'
         }}>
-          {/* Provider and Quality Selection Card */}
-          <div style={{
-            backgroundColor: 'var(--container-bg)',
-            borderRadius: '20px',
-            padding: '32px',
-            boxShadow: 'var(--card-shadow)',
-            border: '1px solid var(--border-color)'
-          }}>
-            <h2 style={{
-              fontSize: '24px',
+          <div>
+            <h1 style={{ 
+              fontSize: '48px', 
               fontWeight: '700',
-              margin: '0 0 24px 0',
-              color: 'var(--text-color)'
+              margin: '0',
+              color: 'var(--text-color)',
+              letterSpacing: '-0.02em'
             }}>
-              AI Configuration
-            </h2>
-            
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-              gap: '24px',
-              marginBottom: '0'
-            }}>
-              <div>
-                <label style={{
-                  display: 'block',
-                  marginBottom: '12px',
-                  fontWeight: '600',
-                  color: 'var(--text-color)',
-                  fontSize: '18px'
-                }}>
-                  AI Provider
-                </label>
-                <select
-                  value={settings.selectedProvider}
-                  onChange={(e) => handleProviderChange(e.target.value as AIProvider)}
-                  style={{
-                    width: '100%',
-                    padding: '16px 20px',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '12px',
-                    fontSize: '16px',
-                    backgroundColor: 'var(--bg-color)',
-                    color: 'var(--text-color)',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  <option value="mistral">Mistral AI</option>
-                  <option value="openai">OpenAI</option>
-                  <option value="anthropic">Anthropic (Claude)</option>
-                  <option value="deepseek">DeepSeek</option>
-                </select>
-              </div>
-              
-              <div>
-                <label style={{
-                  display: 'block',
-                  marginBottom: '12px',
-                  fontWeight: '600',
-                  color: 'var(--text-color)',
-                  fontSize: '18px'
-                }}>
-                  Model Quality
-                </label>
-                <select
-                  value={settings.qualityPreference}
-                  onChange={(e) => handleQualityChange(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '16px 20px',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '12px',
-                    fontSize: '16px',
-                    backgroundColor: 'var(--bg-color)',
-                    color: 'var(--text-color)',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  <option value="fast">Fast (Optimized for speed)</option>
-                  <option value="accurate">Accurate (Optimized for quality)</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* API Key Card */}
-          <div style={{
-            backgroundColor: 'var(--container-bg)',
-            borderRadius: '20px',
-            padding: '32px',
-            boxShadow: 'var(--card-shadow)',
-            border: '1px solid var(--border-color)'
-          }}>
-            <h2 style={{
-              fontSize: '24px',
-              fontWeight: '700',
-              margin: '0 0 12px 0',
-              color: 'var(--text-color)'
-            }}>
-              API Configuration
-            </h2>
+              Hana
+            </h1>
             <p style={{
-              fontSize: '16px',
+              fontSize: '20px',
+              margin: '8px 0 0 0',
               color: 'var(--secondary-text)',
-              margin: '0 0 24px 0',
-              lineHeight: '1.6'
+              fontWeight: '400'
             }}>
-              Enter your API key for {settings.selectedProvider.charAt(0).toUpperCase() + settings.selectedProvider.slice(1)}
+              AI Assistant Settings
             </p>
-            
-            {(['mistral', 'openai', 'anthropic', 'deepseek'] as AIProvider[]).map(provider => (
-              <div 
-                key={provider}
-                style={{
-                  display: settings.selectedProvider === provider ? 'block' : 'none'
-                }}
-              >
-                <label style={{
-                  display: 'block',
-                  marginBottom: '12px',
-                  fontWeight: '600',
-                  color: 'var(--text-color)',
-                  fontSize: '18px'
-                }}>
-                  {provider.charAt(0).toUpperCase() + provider.slice(1)} API Key
-                </label>
-                <input
-                  type="password"
-                  value={settings[`${provider}ApiKey` as keyof SettingsData] || ''}
-                  onChange={(e) => handleApiKeyChange(provider, e.target.value)}
-                  placeholder={`Enter your ${provider} API key`}
-                  style={{
-                    width: '100%',
-                    padding: '16px 20px',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '12px',
-                    fontSize: '16px',
-                    backgroundColor: 'var(--bg-color)',
-                    color: 'var(--text-color)',
-                    boxSizing: 'border-box',
-                    fontFamily: 'monospace',
-                    transition: 'all 0.2s ease'
-                  }}
-                />
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  marginTop: '12px',
-                  padding: '12px 16px',
-                  backgroundColor: darkMode ? 'rgba(170, 105, 196, 0.1)' : 'rgba(228, 75, 121, 0.1)',
-                  borderRadius: '12px',
-                  border: `1px solid ${darkMode ? 'rgba(170, 105, 196, 0.3)' : 'rgba(228, 75, 121, 0.3)'}`
-                }}>
-                  <span style={{ fontSize: '16px' }}>💡</span>
-                  <small style={{
-                    fontSize: '14px',
-                    color: 'var(--secondary-text)',
-                    lineHeight: '1.5'
-                  }}>
-                    Required for {provider} provider.
-                    {provider === 'anthropic' && " API keys start with 'sk-ant-'."}
-                    {(provider === 'deepseek' || provider === 'openai') && " API keys start with 'sk-'."}
-                  </small>
-                </div>
-              </div>
-            ))}
           </div>
-        </div>
-      )}
-
-      {/* Settings Tab */}
-      {activeTab === 'settings' && (
-        <div>
-
-
-          <div style={{ marginBottom: '15px' }}>
-            <label style={{
-              display: 'block',
-              marginBottom: '5px',
-              fontWeight: '500',
-              color: 'var(--text-color)'
-            }}>
-              Keyboard Shortcut:
-            </label>
-            <div style={{
+          
+          {/* Modern Theme Toggle */}
+          <div 
+            style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '10px'
+              gap: '12px',
+              padding: '12px 20px',
+              backgroundColor: 'var(--container-bg)',
+              borderRadius: '20px',
+              border: '1px solid var(--border-color)',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              boxShadow: 'var(--card-shadow)'
+            }}
+            title="Toggle dark mode"
+            onClick={() => handleDarkModeChange(!darkMode)}
+          >
+            <span style={{
+              fontSize: '16px',
+              color: 'var(--secondary-text)',
+              fontWeight: '500'
             }}>
-              <input
-                type="text"
-                value="Alt+F"
-                readOnly
-                style={{
-                  flex: '1',
-                  padding: '8px',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '4px',
-                  fontSize: '14px',
-                  backgroundColor: 'var(--container-bg)',
-                  color: 'var(--text-color)',
-                  fontFamily: '"Courier New", monospace',
-                  fontWeight: 'bold',
-                  textAlign: 'center'
-                }}
-              />
+              {darkMode ? 'Dark' : 'Light'}
+            </span>
+            <div style={{
+              width: '48px',
+              height: '26px',
+              backgroundColor: darkMode ? 'var(--button-primary)' : '#e5e5e7',
+              borderRadius: '13px',
+              position: 'relative',
+              transition: 'all 0.3s ease'
+            }}>
+              <div style={{
+                position: 'absolute',
+                top: '2px',
+                left: darkMode ? '24px' : '2px',
+                width: '22px',
+                height: '22px',
+                backgroundColor: 'white',
+                borderRadius: '11px',
+                transition: 'all 0.3s ease',
+                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.2)'
+              }} />
             </div>
-            <small style={{
-              display: 'block',
-              marginTop: '5px',
-              fontSize: '12px',
-              color: 'var(--text-color)',
-              opacity: '0.8'
-            }}>
-              Custom shortcut to toggle overlay. Ctrl+Alt+F always summarizes.
-            </small>
           </div>
         </div>
-      )}
 
-      {/* Developer Tab */}
-      {activeTab === 'developer' && (
+        {/* Modern Tab Navigation */}
         <div style={{
-          maxWidth: '800px',
-          margin: '0 auto'
+          display: 'flex',
+          gap: '4px',
+          marginBottom: '40px',
+          backgroundColor: 'var(--container-bg)',
+          padding: '8px',
+          borderRadius: '20px',
+          boxShadow: 'var(--card-shadow)',
+          border: '1px solid var(--border-color)',
+          width: 'fit-content',
+          margin: '0 auto 40px auto'
         }}>
-          <div style={{
-            backgroundColor: 'var(--container-bg)',
-            borderRadius: '20px',
-            padding: '32px',
-            boxShadow: 'var(--card-shadow)',
-            border: '1px solid var(--border-color)',
-            marginBottom: '24px'
-          }}>
-            <h2 style={{
-              fontSize: '24px',
-              fontWeight: '700',
-              margin: '0 0 24px 0',
-              color: 'var(--text-color)'
-            }}>
-              Compression Testing
-            </h2>
-            
-            <p style={{
-              color: 'var(--secondary-text)',
-              marginBottom: '20px',
-              lineHeight: '1.6'
-            }}>
-              Test the content compression and decompression functionality used for caching page content.
-            </p>
-            
-            <button 
-              onClick={testCompression}
-              disabled={testingCompression}
+          {(['providers', 'settings', 'info', 'developer'] as const).map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
               style={{
-                padding: '12px 24px',
-                backgroundColor: testingCompression ? 'var(--border-color)' : 'var(--button-secondary)',
-                color: 'white',
+                padding: '14px 28px',
+                cursor: 'pointer',
                 border: 'none',
-                borderRadius: '12px',
-                cursor: testingCompression ? 'not-allowed' : 'pointer',
+                backgroundColor: activeTab === tab ? 'var(--button-primary)' : 'transparent',
+                color: activeTab === tab ? 'white' : 'var(--text-color)',
+                borderRadius: '16px',
                 fontSize: '16px',
                 fontWeight: '600',
-                transition: 'all 0.3s ease'
+                transition: 'all 0.3s ease',
+                boxShadow: activeTab === tab ? '0 4px 12px rgba(0, 0, 0, 0.15)' : 'none',
+                textTransform: 'capitalize'
               }}
               onMouseEnter={(e) => {
-                if (!testingCompression) {
-                  e.currentTarget.style.backgroundColor = 'var(--button-secondary-hover)';
+                if (activeTab !== tab) {
+                  e.currentTarget.style.backgroundColor = 'var(--subtle-bg)';
                 }
               }}
               onMouseLeave={(e) => {
-                if (!testingCompression) {
-                  e.currentTarget.style.backgroundColor = 'var(--button-secondary)';
+                if (activeTab !== tab) {
+                  e.currentTarget.style.backgroundColor = 'transparent';
                 }
               }}
             >
-              {testingCompression ? 'Testing...' : 'Test Compression'}
+              {tab === 'providers' ? 'AI Providers' : tab}
             </button>
-            
-            {compressionResults && (
+          ))}
+        </div>
+
+        {/* Content Area */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: activeTab === 'providers' ? '1fr 400px' : '1fr',
+          gap: '32px',
+          alignItems: 'start'
+        }}>
+          {/* Main Content */}
+          <div>
+            {/* Providers Tab */}
+            {activeTab === 'providers' && (
               <div style={{
-                marginTop: '24px',
-                padding: '20px',
-                backgroundColor: compressionResults.success ? 'var(--success-bg)' : 'var(--error-bg)',
-                borderRadius: '12px',
-                border: `1px solid ${compressionResults.success ? 'var(--success-color)' : 'var(--error-color)'}`
+                display: 'grid',
+                gap: '32px',
+                maxWidth: '800px',
+                margin: '0 auto'
               }}>
-                <h3 style={{
-                  fontSize: '18px',
-                  fontWeight: '600',
-                  margin: '0 0 16px 0',
-                  color: compressionResults.success ? 'var(--success-color)' : 'var(--error-color)'
-                }}>
-                  Test Results
-                </h3>
-                
+                {/* Provider and Quality Selection Card */}
                 <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                  gap: '12px',
-                  fontSize: '14px',
-                  color: 'var(--text-color)'
+                  backgroundColor: 'var(--container-bg)',
+                  borderRadius: '20px',
+                  padding: '32px',
+                  boxShadow: 'var(--card-shadow)',
+                  border: '1px solid var(--border-color)'
                 }}>
-                  <div>
-                    <strong>Success:</strong> {compressionResults.success ? 'Yes' : 'No'}
+                  <h2 style={{
+                    fontSize: '24px',
+                    fontWeight: '700',
+                    margin: '0 0 24px 0',
+                    color: 'var(--text-color)'
+                  }}>
+                    AI Configuration
+                  </h2>
+                  
+                  <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                    gap: '24px',
+                    marginBottom: '0'
+                  }}>
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        marginBottom: '12px',
+                        fontWeight: '600',
+                        color: 'var(--text-color)',
+                        fontSize: '18px'
+                      }}>
+                        AI Provider
+                      </label>
+                      <select
+                        value={settings.selectedProvider}
+                        onChange={(e) => handleProviderChange(e.target.value as AIProvider)}
+                        style={{
+                          width: '100%',
+                          padding: '16px 20px',
+                          border: '1px solid var(--border-color)',
+                          borderRadius: '12px',
+                          fontSize: '16px',
+                          backgroundColor: 'var(--bg-color)',
+                          color: 'var(--text-color)',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        <option value="mistral">Mistral AI</option>
+                        <option value="openai">OpenAI</option>
+                        <option value="anthropic">Anthropic (Claude)</option>
+                        <option value="deepseek">DeepSeek</option>
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        marginBottom: '12px',
+                        fontWeight: '600',
+                        color: 'var(--text-color)',
+                        fontSize: '18px'
+                      }}>
+                        Model Quality
+                      </label>
+                      <select
+                        value={settings.qualityPreference}
+                        onChange={(e) => handleQualityChange(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '16px 20px',
+                          border: '1px solid var(--border-color)',
+                          borderRadius: '12px',
+                          fontSize: '16px',
+                          backgroundColor: 'var(--bg-color)',
+                          color: 'var(--text-color)',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        <option value="fast">Fast (Optimized for speed)</option>
+                        <option value="accurate">Accurate (Optimized for quality)</option>
+                      </select>
+                    </div>
                   </div>
-                  <div>
-                    <strong>Native Support:</strong> {compressionResults.nativeCompressionAvailable ? 'Yes' : 'No'}
+                </div>
+
+                {/* API Key Card */}
+                <div style={{
+                  backgroundColor: 'var(--container-bg)',
+                  borderRadius: '20px',
+                  padding: '32px',
+                  boxShadow: 'var(--card-shadow)',
+                  border: '1px solid var(--border-color)'
+                }}>
+                  <h2 style={{
+                    fontSize: '24px',
+                    fontWeight: '700',
+                    margin: '0 0 12px 0',
+                    color: 'var(--text-color)'
+                  }}>
+                    API Configuration
+                  </h2>
+                  <p style={{
+                    fontSize: '16px',
+                    color: 'var(--secondary-text)',
+                    margin: '0 0 24px 0',
+                    lineHeight: '1.6'
+                  }}>
+                    Enter your API key for {settings.selectedProvider.charAt(0).toUpperCase() + settings.selectedProvider.slice(1)}
+                  </p>
+                  
+                  {(['mistral', 'openai', 'anthropic', 'deepseek'] as AIProvider[]).map(provider => (
+                    <div 
+                      key={provider}
+                      style={{
+                        display: settings.selectedProvider === provider ? 'block' : 'none'
+                      }}
+                    >
+                      <label style={{
+                        display: 'block',
+                        marginBottom: '12px',
+                        fontWeight: '600',
+                        color: 'var(--text-color)',
+                        fontSize: '18px'
+                      }}>
+                        {provider.charAt(0).toUpperCase() + provider.slice(1)} API Key
+                      </label>
+                      <input
+                        type="password"
+                        value={settings[`${provider}ApiKey` as keyof SettingsData] || ''}
+                        onChange={(e) => handleApiKeyChange(provider, e.target.value)}
+                        placeholder={`Enter your ${provider} API key`}
+                        style={{
+                          width: '100%',
+                          padding: '16px 20px',
+                          border: '1px solid var(--border-color)',
+                          borderRadius: '12px',
+                          fontSize: '16px',
+                          backgroundColor: 'var(--bg-color)',
+                          color: 'var(--text-color)',
+                          boxSizing: 'border-box',
+                          fontFamily: 'monospace',
+                          transition: 'all 0.2s ease'
+                        }}
+                      />
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        marginTop: '12px',
+                        padding: '12px 16px',
+                        backgroundColor: 'var(--accent-bg)',
+                        borderRadius: '12px',
+                        border: '1px solid var(--accent-border)'
+                      }}>
+                        <span style={{ fontSize: '16px' }}>💡</span>
+                        <small style={{
+                          fontSize: '14px',
+                          color: 'var(--secondary-text)',
+                          lineHeight: '1.5'
+                        }}>
+                          Required for {provider} provider.
+                          {provider === 'anthropic' && " API keys start with 'sk-ant-'."}
+                          {(provider === 'deepseek' || provider === 'openai') && " API keys start with 'sk-'."}
+                        </small>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Settings Tab */}
+            {activeTab === 'settings' && (
+              <div style={{
+                maxWidth: '800px',
+                margin: '0 auto'
+              }}>
+                <div style={{
+                  backgroundColor: 'var(--container-bg)',
+                  borderRadius: '20px',
+                  padding: '32px',
+                  boxShadow: 'var(--card-shadow)',
+                  border: '1px solid var(--border-color)'
+                }}>
+                  <h2 style={{
+                    fontSize: '24px',
+                    fontWeight: '700',
+                    margin: '0 0 24px 0',
+                    color: 'var(--text-color)'
+                  }}>
+                    Keyboard Shortcuts
+                  </h2>
+
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '20px'
+                  }}>
+                    {/* Editable Alt+F Shortcut */}
+                    <div data-shortcut-recorder style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '20px',
+                      padding: '20px',
+                      backgroundColor: isRecordingShortcut ? 'var(--error-bg)' : 'var(--accent-bg)',
+                      borderRadius: '16px',
+                      border: `1px solid ${isRecordingShortcut ? 'var(--error-color)' : 'var(--accent-border)'}`,
+                      transition: 'all 0.3s ease'
+                    }}>
+                      <button
+                        onClick={startRecordingShortcut}
+                        disabled={isRecordingShortcut}
+                        style={{
+                          backgroundColor: isRecordingShortcut ? 'var(--error-color)' : 'var(--button-primary)',
+                          color: 'white',
+                          border: 'none',
+                          padding: '12px 16px',
+                          borderRadius: '12px',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          fontFamily: 'monospace',
+                          width: '140px',
+                          textAlign: 'center',
+                          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+                          transition: 'all 0.2s ease',
+                          cursor: isRecordingShortcut ? 'not-allowed' : 'pointer',
+                          position: 'relative',
+                          boxSizing: 'border-box'
+                        }}
+                      >
+                        {isRecordingShortcut ? (
+                          recordedKeys.length > 0 ? recordedKeys.join('+') : 'Press keys...'
+                        ) : customShortcut}
+                        {isRecordingShortcut && (
+                          <div style={{
+                            position: 'absolute',
+                            top: '-8px',
+                            right: '-8px',
+                            width: '16px',
+                            height: '16px',
+                            backgroundColor: 'var(--error-color)',
+                            borderRadius: '50%',
+                            animation: 'pulse 1.5s infinite'
+                          }} />
+                        )}
+                      </button>
+                      <div style={{ flex: 1 }}>
+                        <h4 style={{
+                          fontSize: '16px',
+                          fontWeight: '600',
+                          margin: '0 0 4px 0',
+                          color: 'var(--text-color)'
+                        }}>
+                          Toggle AI overlay
+                        </h4>
+                        <p style={{
+                          fontSize: '14px',
+                          color: 'var(--secondary-text)',
+                          margin: '0 0 8px 0',
+                          lineHeight: '1.4'
+                        }}>
+                          {isRecordingShortcut 
+                            ? 'Press a modifier key (Ctrl/Alt/Shift) + another key, then Escape to apply'
+                            : 'Click to record a new shortcut combination'
+                          }
+                        </p>
+                        <div style={{
+                          fontSize: '12px',
+                          color: isRecordingShortcut 
+                            ? (recordedKeys.length >= 2 ? 'var(--success-color)' : 'var(--error-color)')
+                            : 'var(--success-color)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}>
+                          <span>
+                            {isRecordingShortcut 
+                              ? (recordedKeys.length >= 2 ? '✅' : '⏳') 
+                              : '✅'
+                            }
+                          </span>
+                          {isRecordingShortcut 
+                            ? (recordedKeys.length >= 2 
+                                ? 'Press Escape to apply this shortcut' 
+                                : 'Need modifier + key combination')
+                            : 'Current shortcut is active'
+                          }
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Fixed shortcuts */}
+                    {[
+                      { 
+                        shortcut: 'Ctrl+Alt+F', 
+                        description: 'Instant page summary',
+                        note: 'Automatically summarizes the current page content (fixed shortcut)'
+                      },
+                      { 
+                        shortcut: 'Enter', 
+                        description: 'Send message',
+                        note: 'Submit your question when typing in the chat'
+                      },
+                      { 
+                        shortcut: 'Escape', 
+                        description: 'Close overlay',
+                        note: 'Close the chat interface (chat mode only)'
+                      }
+                    ].map((item, index) => (
+                      <div key={index} style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '20px',
+                        padding: '20px',
+                        backgroundColor: 'var(--subtle-bg)',
+                        borderRadius: '16px',
+                        border: '1px solid var(--border-color)'
+                      }}>
+                        <div style={{
+                          backgroundColor: 'var(--button-primary)',
+                          color: 'white',
+                          padding: '12px 16px',
+                          borderRadius: '12px',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          fontFamily: 'monospace',
+                          width: '140px',
+                          textAlign: 'center',
+                          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+                          boxSizing: 'border-box'
+                        }}>
+                          {item.shortcut}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <h4 style={{
+                            fontSize: '16px',
+                            fontWeight: '600',
+                            margin: '0 0 4px 0',
+                            color: 'var(--text-color)'
+                          }}>
+                            {item.description}
+                          </h4>
+                          <p style={{
+                            fontSize: '14px',
+                            color: 'var(--secondary-text)',
+                            margin: '0',
+                            lineHeight: '1.4'
+                          }}>
+                            {item.note}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  {compressionResults.success && (
-                    <>
-                      <div>
-                        <strong>Compression Ratio:</strong> {(compressionResults.results.compressionRatio * 100).toFixed(1)}%
+                </div>
+              </div>
+            )}
+
+            {/* Developer Tab */}
+            {activeTab === 'developer' && (
+              <div style={{
+                maxWidth: '800px',
+                margin: '0 auto'
+              }}>
+                <div style={{
+                  backgroundColor: 'var(--container-bg)',
+                  borderRadius: '20px',
+                  padding: '32px',
+                  boxShadow: 'var(--card-shadow)',
+                  border: '1px solid var(--border-color)',
+                  marginBottom: '24px'
+                }}>
+                  <h2 style={{
+                    fontSize: '24px',
+                    fontWeight: '700',
+                    margin: '0 0 24px 0',
+                    color: 'var(--text-color)'
+                  }}>
+                    Compression Testing
+                  </h2>
+                  
+                  <p style={{
+                    color: 'var(--secondary-text)',
+                    marginBottom: '20px',
+                    lineHeight: '1.6'
+                  }}>
+                    Test the content compression and decompression functionality used for caching page content.
+                  </p>
+                  
+                  <button 
+                    onClick={testCompression}
+                    disabled={testingCompression}
+                    style={{
+                      padding: '12px 24px',
+                      backgroundColor: testingCompression ? 'var(--border-color)' : 'var(--button-secondary)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '12px',
+                      cursor: testingCompression ? 'not-allowed' : 'pointer',
+                      fontSize: '16px',
+                      fontWeight: '600',
+                      transition: 'all 0.3s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!testingCompression) {
+                        e.currentTarget.style.backgroundColor = 'var(--button-secondary-hover)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!testingCompression) {
+                        e.currentTarget.style.backgroundColor = 'var(--button-secondary)';
+                      }
+                    }}
+                  >
+                    {testingCompression ? 'Testing...' : 'Test Compression'}
+                  </button>
+                  
+                  {compressionResults && (
+                    <div style={{
+                      marginTop: '24px',
+                      padding: '20px',
+                      backgroundColor: compressionResults.success ? 'var(--success-bg)' : 'var(--error-bg)',
+                      borderRadius: '12px',
+                      border: `1px solid ${compressionResults.success ? 'var(--success-color)' : 'var(--error-color)'}`
+                    }}>
+                      <h3 style={{
+                        fontSize: '18px',
+                        fontWeight: '600',
+                        margin: '0 0 16px 0',
+                        color: compressionResults.success ? 'var(--success-color)' : 'var(--error-color)'
+                      }}>
+                        Test Results
+                      </h3>
+                      
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                        gap: '12px',
+                        fontSize: '14px',
+                        color: 'var(--text-color)'
+                      }}>
+                        <div>
+                          <strong>Success:</strong> {compressionResults.success ? 'Yes' : 'No'}
+                        </div>
+                        <div>
+                          <strong>Native Support:</strong> {compressionResults.nativeCompressionAvailable ? 'Yes' : 'No'}
+                        </div>
+                        {compressionResults.success && (
+                          <>
+                            <div>
+                              <strong>Compression Ratio:</strong> {(compressionResults.results.compressionRatio * 100).toFixed(1)}%
+                            </div>
+                            <div>
+                              <strong>Round Trip:</strong> {compressionResults.results.roundTripSuccess ? 'Success' : 'Failed'}
+                            </div>
+                          </>
+                        )}
                       </div>
-                      <div>
-                        <strong>Round Trip:</strong> {compressionResults.results.roundTripSuccess ? 'Success' : 'Failed'}
-                      </div>
-                    </>
+                      
+                      {compressionResults.error && (
+                        <div style={{
+                          marginTop: '12px',
+                          padding: '12px',
+                          backgroundColor: 'rgba(255, 0, 0, 0.1)',
+                          borderRadius: '8px',
+                          fontSize: '14px',
+                          color: 'var(--error-color)'
+                        }}>
+                          <strong>Error:</strong> {compressionResults.error}
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
-                
-                {compressionResults.error && (
+              </div>
+            )}
+
+            {/* Info Tab */}
+            {activeTab === 'info' && (
+              <div style={{
+                maxWidth: '800px',
+                margin: '0 auto',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '32px'
+              }}>
+                {/* How to Use Card */}
+                <div style={{
+                  backgroundColor: 'var(--container-bg)',
+                  borderRadius: '20px',
+                  padding: '32px',
+                  boxShadow: 'var(--card-shadow)',
+                  border: '1px solid var(--border-color)'
+                }}>
                   <div style={{
-                    marginTop: '12px',
-                    padding: '12px',
-                    backgroundColor: 'rgba(255, 0, 0, 0.1)',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    color: 'var(--error-color)'
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '16px',
+                    marginBottom: '24px'
                   }}>
-                    <strong>Error:</strong> {compressionResults.error}
+                    <div style={{
+                      width: '48px',
+                      height: '48px',
+                      borderRadius: '12px',
+                      backgroundColor: 'var(--button-primary)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '20px'
+                    }}>
+                      📖
+                    </div>
+                    <h2 style={{
+                      fontSize: '24px',
+                      fontWeight: '700',
+                      margin: '0',
+                      color: 'var(--text-color)'
+                    }}>
+                      How to Use Hana
+                    </h2>
                   </div>
-                )}
+
+                  <p style={{
+                    fontSize: '16px',
+                    color: 'var(--secondary-text)',
+                    margin: '0 0 24px 0',
+                    lineHeight: '1.6'
+                  }}>
+                    Hana is your AI-powered web assistant that helps you understand and interact with webpage content.
+                  </p>
+
+                  <button
+                    onClick={() => setShowInstructions(true)}
+                    style={{
+                      backgroundColor: 'var(--button-primary)',
+                      border: 'none',
+                      color: 'white',
+                      padding: '16px 32px',
+                      borderRadius: '16px',
+                      cursor: 'pointer',
+                      fontSize: '16px',
+                      fontWeight: '600',
+                      transition: 'all 0.3s ease',
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'var(--button-primary-hover)';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 6px 20px rgba(0, 0, 0, 0.15)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'var(--button-primary)';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
+                    }}
+                  >
+                    View Detailed Instructions
+                  </button>
+                </div>
+
+                {/* About Card */}
+                <div style={{
+                  backgroundColor: 'var(--container-bg)',
+                  borderRadius: '20px',
+                  padding: '32px',
+                  boxShadow: 'var(--card-shadow)',
+                  border: '1px solid var(--border-color)'
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '16px',
+                    marginBottom: '24px'
+                  }}>
+                    <div style={{
+                      width: '48px',
+                      height: '48px',
+                      borderRadius: '12px',
+                      backgroundColor: 'var(--button-secondary)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '20px'
+                    }}>
+                      ℹ️
+                    </div>
+                    <h2 style={{
+                      fontSize: '24px',
+                      fontWeight: '700',
+                      margin: '0',
+                      color: 'var(--text-color)'
+                    }}>
+                      About Hana
+                    </h2>
+                  </div>
+
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                    gap: '20px',
+                    marginBottom: '24px'
+                  }}>
+                    <div style={{
+                      padding: '20px',
+                      backgroundColor: 'var(--subtle-bg)',
+                      borderRadius: '12px',
+                      textAlign: 'center'
+                    }}>
+                      <div style={{
+                        fontSize: '24px',
+                        fontWeight: '700',
+                        color: 'var(--button-primary)',
+                        marginBottom: '8px'
+                      }}>
+                        v2.7.0
+                      </div>
+                      <div style={{
+                        fontSize: '14px',
+                        color: 'var(--secondary-text)'
+                      }}>
+                        Current Version
+                      </div>
+                    </div>
+                    
+                    <div style={{
+                      padding: '20px',
+                      backgroundColor: 'var(--subtle-bg)',
+                      borderRadius: '12px',
+                      textAlign: 'center'
+                    }}>
+                      <div style={{
+                        fontSize: '24px',
+                        fontWeight: '700',
+                        color: 'var(--button-secondary)',
+                        marginBottom: '8px'
+                      }}>
+                        4+
+                      </div>
+                      <div style={{
+                        fontSize: '14px',
+                        color: 'var(--secondary-text)'
+                      }}>
+                        AI Providers
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    paddingTop: '20px',
+                    borderTop: '1px solid var(--border-color)'
+                  }}>
+                    <button
+                      onClick={openPrivacyPolicy}
+                      style={{
+                        background: 'none',
+                        border: '1px solid var(--border-color)',
+                        color: 'var(--text-color)',
+                        padding: '12px 24px',
+                        borderRadius: '12px',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'var(--subtle-bg)';
+                        e.currentTarget.style.borderColor = 'var(--button-primary)';
+                        e.currentTarget.style.color = 'var(--button-primary)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                        e.currentTarget.style.borderColor = 'var(--border-color)';
+                        e.currentTarget.style.color = 'var(--text-color)';
+                      }}
+                    >
+                      Privacy Policy
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
           </div>
-        </div>
-      )}
 
-      {/* Info Tab */}
-      {activeTab === 'info' && (
-        <div>
-          <button
-            onClick={() => setShowInstructions(true)}
-            style={{
-              backgroundColor: 'transparent',
-              border: '1px solid var(--border-color)',
-              color: 'var(--text-color)',
-              width: '100%',
-              padding: '10px 16px',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: '500',
-              marginBottom: '15px'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--container-bg)';
-              e.currentTarget.style.borderColor = 'var(--button-primary)';
-              e.currentTarget.style.color = 'var(--button-primary)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
-              e.currentTarget.style.borderColor = 'var(--border-color)';
-              e.currentTarget.style.color = 'var(--text-color)';
-            }}
-          >
-            How to Use
-          </button>
-          
+          {/* Sidebar for Save Button and Status (only on providers tab) */}
+          {activeTab === 'providers' && (
+            <div style={{
+              position: 'sticky',
+              top: '40px'
+            }}>
+              {/* Save Settings Card */}
+              <div style={{
+                backgroundColor: 'var(--container-bg)',
+                borderRadius: '20px',
+                padding: '32px',
+                boxShadow: 'var(--card-shadow)',
+                border: '1px solid var(--border-color)',
+                marginBottom: '24px'
+              }}>
+                <h3 style={{
+                  fontSize: '20px',
+                  fontWeight: '600',
+                  margin: '0 0 16px 0',
+                  color: 'var(--text-color)'
+                }}>
+                  Save Configuration
+                </h3>
+                <p style={{
+                  fontSize: '14px',
+                  color: 'var(--secondary-text)',
+                  margin: '0 0 24px 0',
+                  lineHeight: '1.5'
+                }}>
+                  Save your AI provider and API key settings to start using Hana.
+                </p>
+                
+                <button
+                  onClick={saveSettings}
+                  disabled={isSaving || !privacyAccepted}
+                  style={{
+                    width: '100%',
+                    backgroundColor: privacyAccepted ? 'var(--button-primary)' : 'var(--border-color)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '16px 24px',
+                    borderRadius: '16px',
+                    cursor: privacyAccepted ? 'pointer' : 'not-allowed',
+                    fontSize: '16px',
+                    fontWeight: '600',
+                    transition: 'all 0.3s ease',
+                    boxShadow: privacyAccepted ? '0 4px 12px rgba(0, 0, 0, 0.1)' : 'none'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (privacyAccepted && !isSaving) {
+                      e.currentTarget.style.backgroundColor = 'var(--button-primary-hover)';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 6px 20px rgba(0, 0, 0, 0.15)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (privacyAccepted && !isSaving) {
+                      e.currentTarget.style.backgroundColor = 'var(--button-primary)';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
+                    }
+                  }}
+                >
+                  {isSaving ? (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                      <div style={{
+                        width: '16px',
+                        height: '16px',
+                        border: '2px solid rgba(255,255,255,0.3)',
+                        borderTop: '2px solid white',
+                        borderRadius: '50%',
+                        animation: 'spin 1s linear infinite'
+                      }} />
+                      Saving...
+                    </div>
+                  ) : 'Save Settings'}
+                </button>
+
+                {/* Status Message */}
+                {saveMessage && (
+                  <div style={{
+                    marginTop: '16px',
+                    padding: '12px 16px',
+                    borderRadius: '12px',
+                    fontSize: '14px',
+                    textAlign: 'center',
+                    backgroundColor: saveMessage.includes('Failed') ? 'var(--error-bg)' : 'var(--success-bg)',
+                    color: saveMessage.includes('Failed') ? 'var(--error-color)' : 'var(--success-color)',
+                    border: `1px solid ${saveMessage.includes('Failed') ? 'var(--error-color)' : 'var(--success-color)'}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px'
+                  }}>
+                    <span>{saveMessage.includes('Failed') ? '❌' : '✅'}</span>
+                    {saveMessage}
+                  </div>
+                )}
+              </div>
+
+              {/* Quick Info Card */}
+              <div style={{
+                backgroundColor: 'var(--accent-bg)',
+                borderRadius: '16px',
+                padding: '24px',
+                border: '1px solid var(--accent-border)'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  marginBottom: '12px'
+                }}>
+                  <span style={{ fontSize: '20px' }}>💡</span>
+                  <h4 style={{
+                    fontSize: '16px',
+                    fontWeight: '600',
+                    margin: '0',
+                    color: 'var(--text-color)'
+                  }}>
+                    Quick Start
+                  </h4>
+                </div>
+                <p style={{
+                  fontSize: '14px',
+                  color: 'var(--secondary-text)',
+                  margin: '0',
+                  lineHeight: '1.5'
+                }}>
+                  Press <strong>Alt+F</strong> on any webpage to ask questions about the content, or <strong>Ctrl+Alt+F</strong> for instant summaries.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Compression Test Message (for developer tab) */}
+        {activeTab === 'developer' && message && (
           <div style={{
-            marginTop: '15px',
-            borderTop: '1px solid var(--border-color)',
-            paddingTop: '10px',
-            textAlign: 'center',
-            fontSize: '12px'
+            position: 'fixed',
+            bottom: '24px',
+            right: '24px',
+            padding: '16px 24px',
+            borderRadius: '16px',
+            fontSize: '14px',
+            backgroundColor: message.type === 'error' ? 'var(--error-bg)' : 'var(--success-bg)',
+            color: message.type === 'error' ? 'var(--error-color)' : 'var(--success-color)',
+            border: `1px solid ${message.type === 'error' ? 'var(--error-color)' : 'var(--success-color)'}`,
+            boxShadow: 'var(--hover-shadow)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            zIndex: 1000
           }}>
-            <button
-              onClick={openPrivacyPolicy}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: 'var(--button-primary)',
-                textDecoration: 'none',
-                cursor: 'pointer',
-                fontSize: '12px',
-                marginBottom: '5px'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.textDecoration = 'underline';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.textDecoration = 'none';
-              }}
-            >
-              Privacy Policy
-            </button>
-            <div style={{ color: 'var(--text-color)', opacity: '0.8' }}>
-              Version 2.7.0
+            <span>{message.type === 'error' ? '❌' : '✅'}</span>
+            {message.text}
+          </div>
+        )}
+
+        {/* Instructions Modal */}
+        {showInstructions && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            backgroundColor: 'rgba(0, 0, 0, 0.6)',
+            zIndex: 1000,
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: '24px',
+            boxSizing: 'border-box'
+          }}>
+            <div style={{
+              backgroundColor: 'var(--container-bg)',
+              padding: '40px',
+              borderRadius: '24px',
+              boxShadow: 'var(--hover-shadow)',
+              position: 'relative',
+              maxWidth: '500px',
+              width: '100%',
+              margin: '0 auto',
+              color: 'var(--text-color)',
+              border: '1px solid var(--border-color)'
+            }}>
+              <button
+                onClick={() => setShowInstructions(false)}
+                style={{
+                  position: 'absolute',
+                  top: '20px',
+                  right: '20px',
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '18px',
+                  cursor: 'pointer',
+                  color: 'var(--secondary-text)',
+                  backgroundColor: 'var(--subtle-bg)',
+                  border: 'none',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--border-color)';
+                  e.currentTarget.style.color = 'var(--text-color)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--subtle-bg)';
+                  e.currentTarget.style.color = 'var(--secondary-text)';
+                }}
+              >
+                ×
+              </button>
+              
+              <h2 style={{
+                marginTop: '0',
+                marginBottom: '24px',
+                fontSize: '24px',
+                fontWeight: '700',
+                color: 'var(--text-color)'
+              }}>
+                How to Use Hana
+              </h2>
+              
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px'
+              }}>
+                {[
+                  { shortcut: 'Alt+F', description: 'Toggle the AI query interface on any webpage' },
+                  { shortcut: 'Ctrl+Alt+F', description: 'Instantly summarize the current page' },
+                  { shortcut: 'Enter', description: 'Send your question after typing it' },
+                  { shortcut: 'Escape', description: 'Close the overlay in chat mode' }
+                ].map((item, index) => (
+                  <div key={index} style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '16px',
+                    padding: '16px',
+                    backgroundColor: 'var(--subtle-bg)',
+                    borderRadius: '12px'
+                  }}>
+                    <div style={{
+                      backgroundColor: 'var(--button-primary)',
+                      color: 'white',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      fontFamily: 'monospace',
+                      minWidth: '80px',
+                      textAlign: 'center'
+                    }}>
+                      {item.shortcut}
+                    </div>
+                    <p style={{
+                      margin: '0',
+                      fontSize: '14px',
+                      color: 'var(--text-color)',
+                      lineHeight: '1.4'
+                    }}>
+                      {item.description}
+                    </p>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Save Button */}
-      <button
-        onClick={saveSettings}
-        disabled={isSaving || !privacyAccepted}
-        style={{
-          width: '100%',
-          backgroundColor: privacyAccepted ? 'var(--button-primary)' : 'var(--border-color)',
-          color: 'white',
-          border: 'none',
-          padding: '10px 16px',
-          borderRadius: '5px',
-          cursor: privacyAccepted ? 'pointer' : 'not-allowed',
-          fontSize: '14px',
-          fontWeight: '500',
-          marginTop: '20px',
-          transition: 'background-color 0.2s'
-        }}
-        onMouseEnter={(e) => {
-          if (privacyAccepted) {
-            e.currentTarget.style.backgroundColor = 'var(--button-primary-hover)';
-          }
-        }}
-        onMouseLeave={(e) => {
-          if (privacyAccepted) {
-            e.currentTarget.style.backgroundColor = 'var(--button-primary)';
-          }
-        }}
-      >
-        {isSaving ? 'Saving...' : 'Save All Settings'}
-      </button>
-
-      {/* Status Message */}
-      {saveMessage && (
-        <div style={{
-          marginTop: '10px',
-          padding: '8px',
-          borderRadius: '4px',
-          fontSize: '12px',
-          textAlign: 'center',
-          backgroundColor: saveMessage.includes('Failed') ? 'var(--error-bg)' : 'var(--success-bg)',
-          color: saveMessage.includes('Failed') ? 'var(--error-color)' : 'var(--success-color)'
-        }}>
-          {saveMessage}
-        </div>
-      )}
-
-      {/* Compression Test Message */}
-      {message && (
-        <div style={{
-          marginTop: '10px',
-          padding: '8px',
-          borderRadius: '4px',
-          fontSize: '12px',
-          textAlign: 'center',
-          backgroundColor: message.type === 'error' ? 'var(--error-bg)' : 'var(--success-bg)',
-          color: message.type === 'error' ? 'var(--error-color)' : 'var(--success-color)'
-        }}>
-          {message.text}
-        </div>
-      )}
-
-      {/* Instructions Modal */}
-      {showInstructions && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          zIndex: 1000,
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          padding: '15px',
-          boxSizing: 'border-box'
-        }}>
-          <div style={{
-            backgroundColor: 'var(--bg-color)',
-            padding: '20px',
-            borderRadius: '5px',
-            boxShadow: '0 4px 15px rgba(0, 0, 0, 0.3)',
-            position: 'relative',
-            maxWidth: '280px',
-            margin: '0 auto',
-            color: 'var(--text-color)'
-          }}>
-            <button
-              onClick={() => setShowInstructions(false)}
-              style={{
-                position: 'absolute',
-                top: '10px',
-                right: '15px',
-                fontSize: '20px',
-                cursor: 'pointer',
-                color: 'var(--text-color)',
-                background: 'none',
-                border: 'none'
-              }}
-            >
-              ×
-            </button>
+        {/* Add animations */}
+        <style>
+          {`
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
             
-            <h2 style={{
-              marginTop: '0',
-              marginBottom: '15px',
-              fontSize: '16px'
-            }}>
-              How to Use
-            </h2>
-            
-            <ul style={{
-              marginBottom: '0',
-              paddingLeft: '20px',
-              lineHeight: '1.5'
-            }}>
-              <li style={{ marginBottom: '8px' }}>
-                Press <strong>Alt+F</strong> (or your custom shortcut) to toggle the AI query interface
-              </li>
-              <li style={{ marginBottom: '8px' }}>
-                Press <strong>Ctrl+Alt+F</strong> to instantly summarize the current page
-              </li>
-              <li style={{ marginBottom: '8px' }}>
-                Type your question about the page content and click <strong>Ask</strong> or press Enter
-              </li>
-              <li>
-                Configure settings and theme in this popup
-              </li>
-            </ul>
-          </div>
-        </div>
-      )}
-      </>
+            @keyframes pulse {
+              0%, 100% { 
+                opacity: 1; 
+                transform: scale(1); 
+              }
+              50% { 
+                opacity: 0.7; 
+                transform: scale(1.1); 
+              }
+            }
+          `}
+        </style>
+      </div>
     )}
     </div>
   );

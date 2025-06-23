@@ -10,10 +10,20 @@
 export function createQuestionPrompt(content: string): string {
   return `You are a helpful AI assistant. Answer the user's question based on the following webpage content. Be concise and accurate. If the answer is not in the content, say so.
 
+FORMATTING REQUIREMENTS:
+- Use proper markdown formatting for better readability
+- Format URLs as markdown links: [Link Text](https://example.com)
+- Use **bold** for emphasis and *italics* when appropriate
+- Use bullet points or numbered lists when listing items
+- Use code blocks (\`\`\`) for code snippets
+- Use inline code (\`code\`) for technical terms
+- Use > blockquotes for important quotes or highlights
+- Use ## headings to structure longer responses
+
 WEBPAGE CONTENT:
 ${content}
 
-Answer the user's question based only on the information provided above.`;
+Answer the user's question based only on the information provided above using proper markdown formatting.`;
 }
 
 /**
@@ -25,13 +35,14 @@ export function createSummaryPrompt(content: string): string {
   return `You are a helpful AI assistant. Summarize the following webpage content in a SHORT and CONCISE way. Focus ONLY on the 2-3 most important points.
 
 REQUIREMENTS:
-- Use bullet points (•) for each key point
+- Use bullet points (-) for each key point
 - Maximum 3 bullet points
 - Each bullet point should be 1-2 sentences maximum
 - No introductory text, start directly with bullet points
-- No line breaks within bullet points - keep each point on a single line
 - Be factual and objective
-- No markdown formatting
+- Use **bold** for key terms or concepts
+- Never use markdown formatting for the bullet points
+- Format any URLs as markdown links: [Link Text](https://example.com)
 
 WEBPAGE CONTENT:
 ${content}

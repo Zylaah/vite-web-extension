@@ -1,5 +1,5 @@
 import React from 'react';
-import ReactMarkdown from 'react-markdown';
+import MessageRenderer from './MessageRenderer';
 
 interface ResponseDisplayProps {
   response: string;
@@ -40,7 +40,7 @@ const ResponseDisplay: React.FC<ResponseDisplayProps> = ({ response, error, isLo
 
   return (
     <div className="prose prose-sm dark:prose-invert max-w-none">
-      <ReactMarkdown>{response}</ReactMarkdown>
+      <MessageRenderer content={response} />
       {isStreaming && (
         <div className="mt-2 flex items-center text-sm text-blue-600 dark:text-blue-400">
           <div className="animate-pulse mr-2">●</div>
