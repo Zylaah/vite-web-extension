@@ -11,6 +11,7 @@ export interface SettingsData {
   selectedProvider: AIProvider;
   qualityPreference: string;
   responseLanguage: 'english' | 'french';
+  darkMode?: boolean; // Optional for backward compatibility
   mistralApiKey?: string;
   openaiApiKey?: string;
   anthropicApiKey?: string;
@@ -31,6 +32,7 @@ export const StorageService = {
         'selectedProvider',
         'qualityPreference',
         'responseLanguage',
+        'darkMode',
         'mistralApiKey',
         'openaiApiKey',
         'anthropicApiKey',
@@ -41,6 +43,7 @@ export const StorageService = {
         selectedProvider: result.selectedProvider || 'mistral',
         qualityPreference: result.qualityPreference || 'balanced',
         responseLanguage: result.responseLanguage || 'english',
+        darkMode: result.darkMode !== undefined ? result.darkMode : window.matchMedia('(prefers-color-scheme: dark)').matches,
         mistralApiKey: result.mistralApiKey || '',
         openaiApiKey: result.openaiApiKey || '',
         anthropicApiKey: result.anthropicApiKey || '',
@@ -52,6 +55,7 @@ export const StorageService = {
         selectedProvider: 'mistral' as AIProvider,
         qualityPreference: 'balanced',
         responseLanguage: 'english' as const,
+        darkMode: window.matchMedia('(prefers-color-scheme: dark)').matches,
         mistralApiKey: '',
         openaiApiKey: '',
         anthropicApiKey: '',

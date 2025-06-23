@@ -230,8 +230,9 @@ export class OverlayController {
     // Apply dark mode based on user settings
     const applyDarkMode = async () => {
       try {
-        // Use system dark mode preference
-        if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        // Get dark mode preference from storage
+        const settings = await StorageService.getSettings();
+        if (settings.darkMode) {
           shadowRoot.host.classList.add('dark-mode');
         } else {
           shadowRoot.host.classList.remove('dark-mode');
@@ -242,6 +243,8 @@ export class OverlayController {
         const systemDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
         if (systemDarkMode) {
           shadowRoot.host.classList.add('dark-mode');
+        } else {
+          shadowRoot.host.classList.remove('dark-mode');
         }
       }
     };

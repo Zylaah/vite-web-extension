@@ -13,6 +13,7 @@ const Options: React.FC = () => {
     selectedProvider: 'mistral',
     qualityPreference: 'balanced',
     responseLanguage: 'english',
+    darkMode: false,
     mistralApiKey: '',
     openaiApiKey: '',
     anthropicApiKey: '',
@@ -42,6 +43,9 @@ const Options: React.FC = () => {
         // Load settings (includes API keys now)
         const storedSettings = await StorageService.getSettings();
         setSettings(storedSettings);
+        
+        // Sync dark mode state with settings
+        setDarkMode(storedSettings.darkMode || false);
         
         // Load custom shortcut
         const result = await browser.storage.sync.get(['customShortcut']);
@@ -84,6 +88,14 @@ const Options: React.FC = () => {
   
   const handleDarkModeChange = async (newDarkMode: boolean) => {
     setDarkMode(newDarkMode);
+    setSettings(prev => ({ ...prev, darkMode: newDarkMode }));
+    
+    // Save dark mode preference to storage immediately
+    try {
+      await StorageService.saveSettings({ darkMode: newDarkMode });
+    } catch (error) {
+      console.error('Failed to save dark mode preference:', error);
+    }
   };
   
 
@@ -733,7 +745,7 @@ const Options: React.FC = () => {
                       </label>
                       <input
                         type="password"
-                        value={settings[`${provider}ApiKey` as keyof SettingsData] || ''}
+                        value={(settings[`${provider}ApiKey` as keyof SettingsData] as string) || ''}
                         onChange={(e) => handleApiKeyChange(provider, e.target.value)}
                         placeholder={`Enter your ${provider} API key`}
                         style={{

@@ -7,23 +7,27 @@ const Popup: React.FC = () => {
   const [settings, setSettings] = useState<SettingsData>({
     selectedProvider: 'mistral',
     qualityPreference: 'balanced',
+    responseLanguage: 'english',
+    darkMode: false,
     mistralApiKey: '',
     openaiApiKey: '',
     anthropicApiKey: '',
     deepseekApiKey: ''
   });
   
-  // Detect system dark mode for UI styling only
-  const [systemDarkMode, setSystemDarkMode] = useState(
-    window.matchMedia('(prefers-color-scheme: dark)').matches
-  );
+  // Use dark mode from settings instead of system preference
+  const [darkMode, setDarkMode] = useState(false);
   
+  // Listen for dark mode changes from storage
   useEffect(() => {
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleChange = (e: MediaQueryListEvent) => setSystemDarkMode(e.matches);
+    const handleStorageChange = (changes: any, area: string) => {
+      if (area === 'local' && changes.darkMode) {
+        setDarkMode(changes.darkMode.newValue);
+      }
+    };
     
-    mediaQuery.addEventListener('change', handleChange);
-    return () => mediaQuery.removeEventListener('change', handleChange);
+    browser.storage.onChanged.addListener(handleStorageChange);
+    return () => browser.storage.onChanged.removeListener(handleStorageChange);
   }, []);
   
   const [loading, setLoading] = useState(true);
@@ -35,6 +39,7 @@ const Popup: React.FC = () => {
       try {
         const userSettings = await StorageService.getSettings();
         setSettings(userSettings);
+        setDarkMode(userSettings.darkMode || false);
         setLoading(false);
       } catch (error) {
         console.error('Error loading settings:', error);
@@ -84,7 +89,7 @@ const Popup: React.FC = () => {
   }
 
   return (
-    <div className={`p-4 min-w-[300px] ${systemDarkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-800'}`}>
+    <div className={`p-4 min-w-[300px] ${darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-800'}`}>
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-xl font-bold">Hana AI Assistant</h1>
       </div>
@@ -100,7 +105,7 @@ const Popup: React.FC = () => {
         <select 
           value={settings.selectedProvider} 
           onChange={handleProviderChange}
-          className={`w-full p-2 rounded border ${systemDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
+          className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
         >
           <option value="mistral">Mistral AI</option>
           <option value="openai">OpenAI</option>
@@ -114,7 +119,7 @@ const Popup: React.FC = () => {
         <select 
           value={settings.qualityPreference} 
           onChange={handleQualityChange}
-          className={`w-full p-2 rounded border ${systemDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
+          className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
         >
           <option value="balanced">Balanced</option>
           <option value="fast">Fast</option>
@@ -128,7 +133,7 @@ const Popup: React.FC = () => {
         <button 
           onClick={openOptions}
           className={`px-4 py-2 rounded ${
-            systemDarkMode 
+            darkMode 
               ? 'bg-purple-600 hover:bg-purple-700 text-white' 
               : 'bg-pink-600 hover:bg-pink-700 text-white'
           }`}
