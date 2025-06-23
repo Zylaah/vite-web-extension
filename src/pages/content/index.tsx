@@ -67,6 +67,9 @@ if (isExtensionContext()) {
     // Connect scraper to overlay state
     scraper.setOverlayOpenCallback(() => overlay.isVisible());
     overlay.setOnOpenCallback(() => scraper.triggerManualScrape());
+    
+    // Inject scraper into overlay for cache-enhanced content access
+    overlay.setScraperController(scraper);
 
     await Promise.all([overlay.init(), scraper.init()]);
 

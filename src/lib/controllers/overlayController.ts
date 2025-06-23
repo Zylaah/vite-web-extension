@@ -17,8 +17,13 @@ export class OverlayController {
   private summaryKeybindString = 'Ctrl+Alt+F';
   private keypressDisposer: (() => void) | null = null;
   private onOverlayOpenCallback: (() => void) | null = null;
+  private scraperController: any; // Will be injected
 
   constructor(private tabManager: TabConversationManager) {}
+
+  setScraperController(scraperController: any): void {
+    this.scraperController = scraperController;
+  }
 
   /** Set callback to trigger when Overlay opens */
   setOnOpenCallback(callback: () => void): void {
@@ -248,19 +253,43 @@ export class OverlayController {
     
     const root = createRoot(appContainer);
     
-    // Function to get current page content from scraper
-    const getCurrentPageContent = () => {
+    // Function to get current page content from scraper with caching
+    const getCurrentPageContent = async () => {
+      if (this.scraperController && typeof this.scraperController.getCurrentContent === 'function') {
+        try {
+          return await this.scraperController.getCurrentContent();
+        } catch (error) {
+          console.warn('Hana: Failed to get content from scraper, falling back to global:', error);
+        }
+      }
       return (window as any).hanaPageContent || '';
     };
 
+    // Function to get content optimized for summaries (prefer cached)
+    const getContentForSummary = async () => {
+      if (this.scraperController && typeof this.scraperController.getContentForSummary === 'function') {
+        try {
+          return await this.scraperController.getContentForSummary();
+        } catch (error) {
+          console.warn('Hana: Failed to get summary content from scraper, falling back to global:', error);
+        }
+      }
+      return (window as any).hanaPageContent || '';
+    };
+
+    // Get initial content synchronously for immediate render
+    const initialContent = (window as any).hanaPageContent || '';
+
     root.render(React.createElement(Overlay, {
       onClose: () => this.hide(),
-      pageContent: getCurrentPageContent(),
+      pageContent: initialContent,
       initialMode: config.mode,
       onModeChange: (mode: 'chat' | 'summary') => {
         // Handle mode changes
       },
-      getPageContent: getCurrentPageContent, // Pass function to get updated content
+      getPageContent: () => (window as any).hanaPageContent || '', // Keep sync for compatibility
+      getContentForSummary: getContentForSummary, // New async function for summaries
+      getCurrentContent: getCurrentPageContent, // New async function for chat
       existingConversation: config.existingConversation,
       onConversationUpdate: (messages: any[], conversationId: string | null) => {
         // Save conversation to tab manager

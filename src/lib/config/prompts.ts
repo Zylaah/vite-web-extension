@@ -17,17 +17,26 @@ Answer the user's question based only on the information provided above.`;
 }
 
 /**
- * Creates a system prompt for summarizing a page
+ * Creates a system prompt for summarizing a page (optimized for speed and conciseness)
  * @param content - The page content
  * @returns The system prompt
  */
 export function createSummaryPrompt(content: string): string {
-  return `You are a helpful AI assistant. Summarize the following webpage content in a concise way. Focus on the main points and key information. Be factual and objective.
+  return `You are a helpful AI assistant. Summarize the following webpage content in a SHORT and CONCISE way. Focus ONLY on the 2-3 most important points.
+
+REQUIREMENTS:
+- Use bullet points (•) for each key point
+- Maximum 3 bullet points
+- Each bullet point should be 1-2 sentences maximum
+- No introductory text, start directly with bullet points
+- No line breaks within bullet points - keep each point on a single line
+- Be factual and objective
+- No markdown formatting
 
 WEBPAGE CONTENT:
 ${content}
 
-Provide a clear, structured summary of the webpage content above.`;
+Provide ONLY the bullet points summary of the webpage content above.`;
 }
 
 /**

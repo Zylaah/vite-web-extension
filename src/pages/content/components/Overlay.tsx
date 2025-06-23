@@ -16,6 +16,8 @@ interface OverlayProps {
   initialMode?: OverlayMode;
   onModeChange?: (mode: OverlayMode) => void;
   getPageContent?: () => string;
+  getCurrentContent?: () => Promise<string>; // New: async content getter with caching
+  getContentForSummary?: () => Promise<string>; // New: optimized for summaries
   existingConversation?: any;
   onConversationUpdate?: (messages: any[], conversationId: string | null) => void;
 }
@@ -26,6 +28,8 @@ const Overlay: React.FC<OverlayProps> = ({
   initialMode = 'chat',
   onModeChange,
   getPageContent,
+  getCurrentContent,
+  getContentForSummary,
   existingConversation,
   onConversationUpdate
 }) => {
@@ -235,17 +239,26 @@ const Overlay: React.FC<OverlayProps> = ({
               aiMessageDiv.className = 'hana-chat-message ai-message';
               aiMessageDiv.innerHTML = '<div class="hana-streaming-response">' + message.chunk.text + '</div>';
               responseRef.current.appendChild(aiMessageDiv);
+              lastStreamingElement = aiMessageDiv.querySelector('.hana-streaming-response');
             } else {
               // In summary mode, create direct streaming response
               const streamingDiv = document.createElement('div');
               streamingDiv.className = 'hana-streaming-response';
               streamingDiv.textContent = message.chunk.text;
               responseRef.current.appendChild(streamingDiv);
+              lastStreamingElement = streamingDiv;
             }
             setIsLoading(false);
           } else {
             // Update existing streaming message
             lastStreamingElement.textContent = message.chunk.text;
+          }
+          
+          // Check if this is the final chunk and mark as done to remove cursor
+          if (message.chunk.isDone && lastStreamingElement) {
+            lastStreamingElement.classList.add('done');
+            setIsStreaming(false);
+            saveConversationState();
           }
           
           // Scroll to bottom
@@ -350,10 +363,35 @@ const Overlay: React.FC<OverlayProps> = ({
       
       // Build the final prompt with chat context for follow-up questions
       const chatContext = getChatContext();
-      const finalPrompt = chatContext ? `${chatContext}${prompt}` : prompt;
+      let finalPrompt = chatContext ? `${chatContext}${prompt}` : prompt;
       
-      // Get current page content from scraper
-      const currentPageContent = getPageContent ? getPageContent() : pageContent;
+      // Get current page content with caching optimization
+      let currentPageContent: string;
+      
+      if (mode === 'summary') {
+        // For summaries, prefer cached content for speed and use optimized prompt
+        if (getContentForSummary) {
+          currentPageContent = await getContentForSummary();
+        } else if (getPageContent) {
+          currentPageContent = getPageContent();
+        } else {
+          currentPageContent = pageContent;
+        }
+        
+        // Use optimized summary prompt
+        if (prompt.toLowerCase().includes('summary') || prompt.toLowerCase().includes('summarize')) {
+          finalPrompt = 'Summarize this page content in a SHORT and CONCISE way. Focus ONLY on the 2-3 most important points. Use bullet points (•) for each key point. Maximum 3 bullet points. Each bullet point should be 1-2 sentences maximum. No introductory text, start directly with bullet points. No line breaks within bullet points - keep each point on a single line. Be factual and objective.';
+        }
+      } else {
+        // For chat, use regular content getter which may use cache or fresh content
+        if (getCurrentContent) {
+          currentPageContent = await getCurrentContent();
+        } else if (getPageContent) {
+          currentPageContent = getPageContent();
+        } else {
+          currentPageContent = pageContent;
+        }
+      }
       
       const result = await BackgroundCommunicator.queryAIStreaming({
         prompt: finalPrompt,

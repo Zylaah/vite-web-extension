@@ -5,6 +5,7 @@
 import { getPageContent } from '../utils/contentExtractor';
 import { portManager } from './portManager';
 import { ContentInitMsg, ContentDeltaMsg } from '../types/messaging';
+import { ContentCacheManager } from '../services/contentCacheManager';
 
 function isSignificant(mutation: MutationRecord): boolean {
   if (mutation.type === 'attributes') {
@@ -53,10 +54,14 @@ export class ScraperController {
   private mutationObserver: MutationObserver | null = null;
   private readonly tabId: number;
   private overlayOpenCallback: (() => boolean) | null = null;
+  private cacheManager: ContentCacheManager;
+  private lastContentHash = '';
 
   constructor(tabId: number) {
     this.tabId = tabId;
     this.currentUrl = window.location.href;
+    this.cacheManager = ContentCacheManager.getInstance();
+    this.cacheManager.setDebug(true); // Enable debugging to track compression issue
   }
 
   /** Set callback to check if Overlay is open */
@@ -71,8 +76,12 @@ export class ScraperController {
 
   /** Initialize scraping infrastructure but do NOT start observers yet. */
   async init(): Promise<void> {
+    console.log('Hana ScraperController: Initializing with cache for tab', this.tabId);
     this.prepareMutationObserver();
     this.prepareNavigationHooks();
+    
+    // Perform initial scrape and cache
+    await this.performInitialScrapeWithCache();
   }
 
   /** Perform initial scrape and start observing */
@@ -94,12 +103,46 @@ export class ScraperController {
   }
 
   cleanup(): void {
+    console.log('Hana ScraperController: Cleaning up');
     this.stop();
   }
 
   /** Public accessor for the latest scraped raw text (for debugging). */
   getLastScrapeContent(): string {
     return this.lastScrapeContent;
+  }
+
+  /**
+   * Get current page content, checking cache first for better performance
+   */
+  async getCurrentContent(forceRefresh = false): Promise<string> {
+    // Check cache first unless force refresh is requested
+    if (!forceRefresh) {
+      const cachedContent = await this.cacheManager.getLatestContent(this.tabId);
+      if (cachedContent && this.cacheManager.hasRecentContent(this.tabId, 2 * 60 * 1000)) {
+        console.log('Hana ScraperController: Using cached content, length:', cachedContent.length, 'preview:', cachedContent.substring(0, 100));
+        return cachedContent;
+      }
+    }
+
+    // Cache miss or force refresh - scrape fresh content
+    return await this.scrapeContentWithCache('manual', true);
+  }
+
+  /**
+   * Get content optimized for summary (prefer cached content for speed)
+   */
+  async getContentForSummary(): Promise<string> {
+    // For summaries, we prefer cached content to speed up response
+    const cachedContent = await this.cacheManager.getLatestContent(this.tabId);
+    if (cachedContent && this.cacheManager.hasRecentContent(this.tabId, 5 * 60 * 1000)) {
+      console.log('Hana ScraperController: Using cached content for summary, length:', cachedContent.length, 'preview:', cachedContent.substring(0, 100));
+      return cachedContent;
+    }
+
+    // No recent cache - scrape and cache
+    console.log('Hana ScraperController: No recent cache, scraping for summary');
+    return await this.scrapeContentWithCache('manual', true);
   }
 
   /** Check if we can scrape based on rate limiting */
@@ -127,8 +170,25 @@ export class ScraperController {
   }
 
   // -------------------------------------------
-  // Scraping helpers
+  // Scraping helpers with cache integration
   // -------------------------------------------
+
+  private async performInitialScrapeWithCache(): Promise<void> {
+    if (!this.canScrape()) {
+      console.log('Hana ScraperController: Skipping initial scrape - rate limited');
+      // Try to use cached content
+      const cachedContent = await this.cacheManager.getLatestContent(this.tabId);
+      if (cachedContent) {
+        this.lastScrapeContent = cachedContent;
+        (window as any).hanaPageContent = cachedContent;
+        console.log('Hana ScraperController: Using cached content for initial load');
+        return;
+      }
+      return;
+    }
+
+    await this.scrapeContentWithCache('init', true);
+  }
 
   private async performInitialScrape(): Promise<void> {
     if (!this.canScrape()) {
@@ -171,116 +231,223 @@ export class ScraperController {
       return;
     }
     
-    const scrapedContent = getPageContent();
-    
-    // Only send if changed significantly
-    if (!this.hasSignificantContentChange(scrapedContent, changeType)) {
-      return;
-    }
-    
-    this.lastScrapeContent = scrapedContent;
-    this.lastScrapeUrl = currentUrl;
-    this.lastScrapeTime = now;
-    this.recordScrape();
-
-    // Update global access
-    (window as any).hanaPageContent = scrapedContent;
-
-    const msg: ContentDeltaMsg = {
-      type: 'DELTA_SCRAPE',
-      tabId: this.tabId,
-      url: window.location.href,
-      html: scrapedContent,
-      changeType,
-      timestamp: Date.now(),
-    };
-    
-    console.log(`Hana ScraperController: Delta scrape completed (${changeType}), content length: ${scrapedContent.length}`);
-    // TODO: Send to background via port manager when implemented
+    await this.scrapeContentWithCache(changeType, false);
   }, 500);
+
+  /**
+   * Enhanced scraping with cache integration
+   */
+  private async scrapeContentWithCache(changeType: 'init' | 'mutation' | 'navigation' | 'manual', force = false): Promise<string> {
+    try {
+      console.log(`Hana ScraperController: Scraping content with cache (${changeType})...`);
+      
+      const content = getPageContent();
+      const contentHash = this.generateContentHash(content);
+      
+      // Check if content has actually changed (avoid unnecessary caching)
+      if (!force && contentHash === this.lastContentHash) {
+        console.log('Hana ScraperController: Content unchanged, skipping cache update');
+        return content;
+      }
+
+      // Significant change detection for mutations
+      if (changeType === 'mutation' && this.lastContentHash) {
+        if (!this.hasSignificantContentChange(content, changeType)) {
+          return content;
+        }
+      }
+
+      // Cache the new content
+      await this.cacheManager.addSnapshot({
+        tabId: this.tabId,
+        url: window.location.href,
+        title: document.title || 'Untitled',
+        content,
+        changeType
+      });
+
+      this.lastScrapeContent = content;
+      this.lastScrapeUrl = window.location.href;
+      this.lastScrapeTime = Date.now();
+      this.lastContentHash = contentHash;
+      this.recordScrape();
+
+      // Store for global access
+      (window as any).hanaPageContent = content;
+
+      console.log(`Hana ScraperController: Content scraped and cached (${content.length} chars, ${changeType})`);
+      
+      // Log cache stats occasionally
+      if (changeType === 'init' || Math.random() < 0.1) {
+        const stats = this.cacheManager.getStats();
+        console.log('Hana ContentCache stats:', stats);
+      }
+
+             // Send delta message if not initial
+       if (changeType !== 'init') {
+         const msg: ContentDeltaMsg = {
+           type: 'DELTA_SCRAPE',
+           tabId: this.tabId,
+           url: window.location.href,
+           html: content,
+           changeType,
+           timestamp: Date.now(),
+         };
+         // TODO: Send to background via port manager when implemented
+       }
+
+      return content;
+      
+    } catch (error) {
+      console.error('Hana ScraperController: Scraping failed:', error);
+      
+      // Fallback to cached content
+      const cachedContent = await this.cacheManager.getLatestContent(this.tabId);
+      if (cachedContent) {
+        console.log('Hana ScraperController: Using cached content as fallback');
+        return cachedContent;
+      }
+      
+      throw error;
+    }
+  }
 
   private hasSignificantContentChange(newContent: string, changeType: string): boolean {
     const oldLength = this.lastScrapeContent.length;
     const newLength = newContent.length;
     
-    // For manual scrapes, always consider significant
-    if (changeType === 'manual') return true;
-    
-    // For navigation, always consider significant
-    if (changeType === 'navigation') return true;
-    
-    // For mutations, check change threshold
-    const lengthDiff = Math.abs(newLength - oldLength);
-    const percentChange = oldLength > 0 ? lengthDiff / oldLength : 1;
-    
-    // Consider significant if content changed by more than 5% or 100 characters
-    const isSignificant = percentChange > 0.05 || lengthDiff > 100;
-    
-    if (!isSignificant) {
-      console.log(`Hana ScraperController: Content change not significant (${lengthDiff} chars, ${(percentChange * 100).toFixed(1)}%)`);
+    // Special handling for navigation - always significant
+    if (changeType === 'navigation') {
+      return true;
     }
     
-    return isSignificant;
+    // Length change threshold
+    const lengthChange = Math.abs(newLength - oldLength);
+    const lengthChangePercent = oldLength > 0 ? (lengthChange / oldLength) * 100 : 100;
+    
+    if (lengthChangePercent > 5) { // >5% length change
+      console.log(`Hana ScraperController: Significant length change: ${lengthChangePercent.toFixed(1)}%`);
+      return true;
+    }
+    
+    // Content similarity check (basic)
+    const similarity = this.calculateContentSimilarity(this.lastScrapeContent, newContent);
+    if (similarity < 0.95) { // Less than 95% similar
+      console.log(`Hana ScraperController: Significant content change: ${((1 - similarity) * 100).toFixed(1)}% different`);
+      return true;
+    }
+    
+    return false;
   }
 
-  // -------------------------------------------
-  // Observers
-  // -------------------------------------------
+  private calculateContentSimilarity(content1: string, content2: string): number {
+    if (content1 === content2) return 1.0;
+    if (content1.length === 0 && content2.length === 0) return 1.0;
+    if (content1.length === 0 || content2.length === 0) return 0.0;
+    
+    // Simple approach: count common substrings
+    const shorter = content1.length < content2.length ? content1 : content2;
+    const longer = content1.length >= content2.length ? content1 : content2;
+    
+    let matches = 0;
+    const chunkSize = 50;
+    
+    for (let i = 0; i <= shorter.length - chunkSize; i += chunkSize) {
+      const chunk = shorter.substr(i, chunkSize);
+      if (longer.includes(chunk)) {
+        matches++;
+      }
+    }
+    
+    const totalChunks = Math.ceil(shorter.length / chunkSize);
+    return totalChunks > 0 ? matches / totalChunks : 0;
+  }
 
   private prepareMutationObserver(): void {
     this.mutationObserver = new MutationObserver((mutations) => {
       const significantMutations = mutations.filter(isSignificant);
       if (significantMutations.length > 0) {
-        console.log(`Hana ScraperController: ${significantMutations.length} significant mutations detected`);
         this.performDeltaScrape('mutation');
       }
     });
   }
 
   private prepareNavigationHooks(): void {
-    // Navigation detection will be set up when activated
+    // Will be overridden by activateNavigationHooks
   }
 
   private activateNavigationHooks(): void {
-    // Listen for URL changes (SPA navigation)
-    let lastUrl = window.location.href;
-    
+    // Watch for URL changes
     const checkUrlChange = () => {
-      const currentUrl = window.location.href;
-      if (currentUrl !== lastUrl) {
-        console.log(`Hana ScraperController: Navigation detected: ${lastUrl} -> ${currentUrl}`);
-        lastUrl = currentUrl;
-        this.currentUrl = currentUrl;
+      const newUrl = window.location.href;
+      if (newUrl !== this.currentUrl) {
+        console.log(`Hana ScraperController: URL changed from ${this.currentUrl} to ${newUrl}`);
+        this.currentUrl = newUrl;
+        
+        // Clear cache for navigation
+        this.cacheManager.clearTab(this.tabId);
+        this.lastContentHash = '';
+        
         this.performDeltaScrape('navigation');
       }
     };
 
-    // Override pushState and replaceState
+    // Check for URL changes every 1 second
+    setInterval(checkUrlChange, 1000);
+
+    // Listen for popstate events (back/forward)
+    window.addEventListener('popstate', () => {
+      setTimeout(checkUrlChange, 100);
+    });
+
+    // Override pushState and replaceState to detect programmatic navigation
     const originalPushState = history.pushState;
     const originalReplaceState = history.replaceState;
-    
+
     history.pushState = function(...args) {
-      originalPushState.apply(history, args);
-      setTimeout(checkUrlChange, 0);
-    };
-    
-    history.replaceState = function(...args) {
-      originalReplaceState.apply(history, args);
-      setTimeout(checkUrlChange, 0);
+      originalPushState.apply(this, args);
+      setTimeout(checkUrlChange, 100);
     };
 
-    // Listen for popstate
-    window.addEventListener('popstate', checkUrlChange);
-    
-    // Store cleanup function
-    this.deactivateNavigationHooks = () => {
-      history.pushState = originalPushState;
-      history.replaceState = originalReplaceState;
-      window.removeEventListener('popstate', checkUrlChange);
+    history.replaceState = function(...args) {
+      originalReplaceState.apply(this, args);
+      setTimeout(checkUrlChange, 100);
     };
   }
 
   private deactivateNavigationHooks(): void {
     // Will be overridden by activateNavigationHooks
+  }
+
+  private generateContentHash(content: string): string {
+    let hash = 0;
+    for (let i = 0; i < content.length; i++) {
+      const char = content.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash;
+    }
+    return Math.abs(hash).toString(36);
+  }
+
+  /**
+   * Clear cache for current tab (useful for navigation)
+   */
+  clearCache(): void {
+    this.cacheManager.clearTab(this.tabId);
+    this.lastContentHash = '';
+  }
+
+  /**
+   * Get cache statistics
+   */
+  getCacheStats() {
+    return this.cacheManager.getStats();
+  }
+
+  /**
+   * Force cache cleanup
+   */
+  cleanupCache(): void {
+    this.cacheManager.cleanup();
   }
 } 
