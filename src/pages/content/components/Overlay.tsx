@@ -4,6 +4,9 @@ import browser from 'webextension-polyfill';
 import { BackgroundCommunicator } from '../../../lib/services/backgroundCommunicator';
 import MessageRenderer from './MessageRenderer';
 
+// Global registry to track the active overlay instance
+let activeOverlayInstanceId: string | null = null;
+
 // Types for better type safety
 type OverlayMode = 'chat' | 'summary';
 
@@ -39,7 +42,25 @@ const Overlay: React.FC<OverlayProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const responseRef = useRef<HTMLDivElement>(null);
   
-  const [mode, setMode] = useState<OverlayMode>(initialMode);
+  // Use initialMode directly instead of state to prevent mode changes
+  const mode = initialMode;
+  
+  // Generate a unique instance ID for this overlay
+  const instanceId = useRef(`overlay-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
+  
+  // Register this instance as active and cleanup on unmount
+  useEffect(() => {
+    console.log('Hana Overlay: Component mounted with mode:', mode, 'initialMode:', initialMode, 'instanceId:', instanceId.current);
+    activeOverlayInstanceId = instanceId.current;
+    
+    return () => {
+      console.log('Hana Overlay: Component unmounting, instanceId:', instanceId.current);
+      // Clear active instance if this was the active one
+      if (activeOverlayInstanceId === instanceId.current) {
+        activeOverlayInstanceId = null;
+      }
+    };
+  }, []);
   const [isLoading, setIsLoading] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -214,10 +235,22 @@ const Overlay: React.FC<OverlayProps> = ({
     const handleClickOutside = (event: MouseEvent) => {
       if (event.button !== 0) return; // Only handle left clicks
       
-      // Only dismiss on click outside in summary mode
-      if (mode === 'summary' && overlayRef.current && !overlayRef.current.contains(event.target as Node)) {
-        onClose();
+      // Check if this instance is still the active one
+      if (activeOverlayInstanceId !== instanceId.current) {
+        console.log('Hana Overlay: Ignoring click from inactive instance:', instanceId.current, 'active:', activeOverlayInstanceId);
+        return;
       }
+      
+      console.log('Hana Overlay: Click outside detected, current mode:', mode, 'instanceId:', instanceId.current);
+      
+      // Only dismiss on click outside in summary mode - NEVER in chat mode
+      if (mode === 'summary' && overlayRef.current && !overlayRef.current.contains(event.target as Node)) {
+        console.log('Hana Overlay: Dismissing overlay in summary mode');
+        onClose();
+      } else if (mode === 'chat') {
+        console.log('Hana Overlay: Click outside ignored in chat mode');
+      }
+      // In chat mode, clicking outside should NOT close the overlay
     };
 
     const handleOverlayClick = (event: MouseEvent) => {
@@ -257,6 +290,11 @@ const Overlay: React.FC<OverlayProps> = ({
   // Handle escape key to close (only in chat mode, summary mode needs close button)
   useEffect(() => {
     const handleEscKey = (event: KeyboardEvent) => {
+      // Check if this instance is still the active one
+      if (activeOverlayInstanceId !== instanceId.current) {
+        return;
+      }
+      
       if (event.key === 'Escape' && mode === 'chat') {
         onClose();
       }

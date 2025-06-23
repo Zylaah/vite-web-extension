@@ -57,9 +57,17 @@ export class OverlayController {
   async show(mode: 'chat' | 'summary' = 'chat'): Promise<void> {
     console.log('Hana: show() called with mode:', mode, 'enabled:', this.overlayEnabled, 'visible:', this.isOverlayVisible);
     
-    if (!this.overlayEnabled || this.isOverlayVisible) {
-      console.log('Hana: show() aborted - overlay disabled or already visible');
+    if (!this.overlayEnabled) {
+      console.log('Hana: show() aborted - overlay disabled');
       return;
+    }
+    
+    // Force cleanup of any existing overlay before creating new one
+    if (this.isOverlayVisible || this.overlayInstance) {
+      console.log('Hana: Cleaning up existing overlay before creating new one');
+      this.hide();
+      // Wait a bit to ensure cleanup is complete
+      await new Promise(resolve => setTimeout(resolve, 50));
     }
 
     try {
@@ -87,12 +95,20 @@ export class OverlayController {
   }
 
   hide(): void {
-    if (!this.isOverlayVisible) return;
-
-    // Remove the shadow DOM container
+    console.log('Hana: hide() called, visible:', this.isOverlayVisible, 'instance exists:', !!this.overlayInstance);
+    
+    // Remove the shadow DOM container even if isOverlayVisible is false
     if (this.overlayInstance) {
+      console.log('Hana: Removing overlay instance');
       this.overlayInstance.remove();
       this.overlayInstance = null;
+    }
+    
+    // Also ensure any lingering containers are removed
+    const existingContainer = document.getElementById('hana-extension-container');
+    if (existingContainer) {
+      console.log('Hana: Removing lingering container');
+      existingContainer.remove();
     }
 
     this.isOverlayVisible = false;
@@ -281,6 +297,7 @@ export class OverlayController {
     const initialContent = (window as any).hanaPageContent || '';
 
     root.render(React.createElement(Overlay, {
+      key: `overlay-${config.mode}-${Date.now()}`, // Force remount for different modes
       onClose: () => this.hide(),
       pageContent: initialContent,
       initialMode: config.mode,
