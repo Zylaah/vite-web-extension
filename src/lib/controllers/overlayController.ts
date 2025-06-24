@@ -22,7 +22,7 @@ export class OverlayController {
   private keypressDisposer: (() => void) | null = null;
   private onOverlayOpenCallback: (() => void) | null = null;
   private scraperController: any; // Will be injected
-  private isTransitioning = false; // Prevent rapid toggle operations
+
   private lastKeyPressTime = 0; // Debounce rapid keypresses
 
   constructor(private tabManager: TabConversationManager) {}
@@ -57,27 +57,16 @@ export class OverlayController {
   // ---------------------------------------------------------
 
   async show(mode: 'chat' | 'summary' = 'chat'): Promise<void> {
-    console.log('Hana: show() called with mode:', mode, 'enabled:', this.overlayEnabled, 'visible:', this.isOverlayVisible, 'transitioning:', this.isTransitioning);
+    console.log('Hana: show() called with mode:', mode, 'enabled:', this.overlayEnabled, 'visible:', this.isOverlayVisible);
     
-    if (!this.overlayEnabled || this.isTransitioning) {
-      console.log('Hana: show() aborted - overlay disabled or transitioning');
+    if (!this.overlayEnabled) {
+      console.log('Hana: show() aborted - overlay disabled');
       return;
     }
     
-    // Set transitioning flag to prevent rapid operations
-    this.isTransitioning = true;
-    
-    try {
-      // Force cleanup of any existing overlay before creating new one
-      if (this.isOverlayVisible || this.overlayInstance) {
-        console.log('Hana: Cleaning up existing overlay before creating new one');
-        this.hide();
-        // Wait longer to ensure complete cleanup
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-    } catch (error) {
-      console.error('Hana: Error during cleanup:', error);
-      this.isTransitioning = false;
+    // If overlay is already visible, just return (no need to recreate)
+    if (this.isOverlayVisible) {
+      console.log('Hana: Overlay already visible, skipping');
       return;
     }
 
@@ -104,53 +93,51 @@ export class OverlayController {
       }
     } catch (error) {
       console.error('Hana: Error in show():', error);
-    } finally {
-      // Always clear transitioning flag
-      this.isTransitioning = false;
+      // Reset state on error
+      this.isOverlayVisible = false;
+      this.overlayInstance = null;
     }
   }
 
   hide(): void {
     console.log('Hana: hide() called, visible:', this.isOverlayVisible, 'instance exists:', !!this.overlayInstance);
     
-    // Set transitioning flag
-    this.isTransitioning = true;
-    
-    try {
-      // Save conversation to history before closing
-      this.saveCurrentConversationToHistory();
-      
-      // Clear the conversation from session storage so it doesn't restore next time
-      this.tabManager.clearConversation();
-      console.log('Hana: Conversation cleared from session storage');
-      
-      // Remove the shadow DOM container even if isOverlayVisible is false
-      if (this.overlayInstance) {
-        console.log('Hana: Removing overlay instance');
-        this.overlayInstance.remove();
-        this.overlayInstance = null;
-      }
-      
-      // Also ensure any lingering containers are removed with more thorough cleanup
-      const existingContainers = document.querySelectorAll('#hana-extension-container');
-      existingContainers.forEach(container => {
-        console.log('Hana: Removing lingering container');
-        container.remove();
-      });
-
-      this.isOverlayVisible = false;
-      
-      // Restore focus so keybind continues working
-      if (document.activeElement && document.activeElement !== document.body) {
-        (document.activeElement as HTMLElement).blur();
-      }
-      document.body.focus();
-    } finally {
-      // Clear transitioning flag after a small delay to prevent immediate re-triggering
-      setTimeout(() => {
-        this.isTransitioning = false;
-      }, 150);
+    // If already hidden, nothing to do
+    if (!this.isOverlayVisible && !this.overlayInstance) {
+      console.log('Hana: Overlay already hidden, skipping');
+      return;
     }
+    
+    // Save conversation to history before closing
+    this.saveCurrentConversationToHistory();
+    
+    // Clear the conversation from session storage so it doesn't restore next time
+    this.tabManager.clearConversation();
+    console.log('Hana: Conversation cleared from session storage');
+    
+    // Remove the shadow DOM container
+    if (this.overlayInstance) {
+      console.log('Hana: Removing overlay instance');
+      this.overlayInstance.remove();
+      this.overlayInstance = null;
+    }
+    
+    // Clean up any lingering containers (safety measure)
+    const existingContainers = document.querySelectorAll('#hana-extension-container');
+    existingContainers.forEach(container => {
+      console.log('Hana: Removing lingering container');
+      container.remove();
+    });
+
+    this.isOverlayVisible = false;
+    
+    // Restore focus so keybind continues working
+    if (document.activeElement && document.activeElement !== document.body) {
+      (document.activeElement as HTMLElement).blur();
+    }
+    document.body.focus();
+    
+    console.log('Hana: Overlay hidden successfully');
   }
 
   /**
@@ -221,9 +208,9 @@ export class OverlayController {
 
     // Handle multiple keybinds
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Debounce rapid keypresses
+      // Light debounce to prevent accidental double-presses
       const now = Date.now();
-      if (now - this.lastKeyPressTime < 200) {
+      if (now - this.lastKeyPressTime < 100) {
         console.log('Hana: Ignoring rapid keypress');
         return;
       }
@@ -235,8 +222,7 @@ export class OverlayController {
           ctrlKey: e.ctrlKey,
           altKey: e.altKey,
           key: e.key,
-          overlayVisible: this.isOverlayVisible,
-          transitioning: this.isTransitioning
+          overlayVisible: this.isOverlayVisible
         });
       }
       
@@ -253,12 +239,6 @@ export class OverlayController {
       if (e.altKey && !e.ctrlKey && e.key.toLowerCase() === 'f') {
         e.preventDefault();
         e.stopPropagation();
-        
-        // Prevent rapid toggling
-        if (this.isTransitioning) {
-          console.log('Hana: Ignoring keypress - transition in progress');
-          return;
-        }
         
         console.log('Hana: Toggling overlay in chat mode, currently visible:', this.isOverlayVisible);
         
