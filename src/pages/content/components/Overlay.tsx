@@ -426,7 +426,27 @@ const Overlay: React.FC<OverlayProps> = ({
       }
       
       if (message.action === 'streaming-error') {
-        setError(message.error || 'An error occurred during streaming');
+        let errorMessage = message.error || 'An error occurred during streaming';
+        
+        // Enhanced error message handling for streaming errors
+        if (errorMessage.includes('API key') && errorMessage.includes('not found')) {
+          const providerNames: Record<string, string> = {
+            mistral: 'Mistral AI',
+            openai: 'OpenAI', 
+            anthropic: 'Anthropic',
+            deepseek: 'DeepSeek'
+          };
+          const providerName = providerNames[settings.selectedProvider] || settings.selectedProvider;
+          errorMessage = `⚠️ No API key configured for ${providerName}.\n\nPlease add your ${providerName} API key in the extension settings to use this feature.`;
+        } else if (errorMessage.includes('authentication') || errorMessage.includes('invalid') || errorMessage.includes('401')) {
+          errorMessage = `❌ Authentication failed. Please check your API key in the extension settings.`;
+        } else if (errorMessage.includes('rate limit') || errorMessage.includes('429')) {
+          errorMessage = `⏳ Rate limit reached. Please try again in a few moments.`;
+        } else if (errorMessage.includes('timeout')) {
+          errorMessage = `⏱️ Request timed out. Please try again.`;
+        }
+        
+        setError(errorMessage);
         setIsLoading(false);
         setIsStreaming(false);
       }
@@ -501,6 +521,28 @@ const Overlay: React.FC<OverlayProps> = ({
     }
     
     try {
+      // Pre-validate API key exists for the selected provider
+      console.log('🔐 Hana: Validating API key for provider:', settings.selectedProvider);
+      const apiKey = await browser.storage.local.get(`${settings.selectedProvider}ApiKey`);
+      const keyName = `${settings.selectedProvider}ApiKey`;
+      const keyValue = apiKey[keyName] as string;
+      
+      if (!keyValue || keyValue.trim() === '') {
+        const providerNames: Record<string, string> = {
+          mistral: 'Mistral AI',
+          openai: 'OpenAI', 
+          anthropic: 'Anthropic',
+          deepseek: 'DeepSeek'
+        };
+        
+        const providerName = providerNames[settings.selectedProvider] || settings.selectedProvider;
+        const errorMessage = `⚠️ No API key configured for ${providerName}.\n\nPlease add your ${providerName} API key in the extension settings to use this feature.`;
+        
+        setError(errorMessage);
+        setIsLoading(false);
+        return;
+      }
+      
       setIsStreaming(true);
       
       // Build the final prompt with chat context for follow-up questions
@@ -559,13 +601,28 @@ const Overlay: React.FC<OverlayProps> = ({
       console.log('📡 Hana: API call returned at', Date.now() - startTime, 'ms, received:', result.received);
       
       if (!result.received) {
-        setError('Failed to start streaming request');
+        setError('Failed to start streaming request. Please try again.');
         setIsLoading(false);
         setIsStreaming(false);
       }
     } catch (e: any) {
       console.error('❌ Hana: Error at', Date.now() - startTime, 'ms:', e);
-      setError(e.message || 'An error occurred while processing your request');
+      let errorMessage = 'An error occurred while processing your request';
+      
+      // Enhanced error message handling
+      if (e.message) {
+        if (e.message.includes('API key')) {
+          errorMessage = e.message;
+        } else if (e.message.includes('authentication') || e.message.includes('invalid key')) {
+          errorMessage = `❌ Authentication failed. Please check your API key in the extension settings.`;
+        } else if (e.message.includes('rate limit')) {
+          errorMessage = `⏳ Rate limit reached. Please try again in a few moments.`;
+        } else {
+          errorMessage = e.message;
+        }
+      }
+      
+      setError(errorMessage);
       setIsLoading(false);
       setIsStreaming(false);
     }

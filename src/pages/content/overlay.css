@@ -484,9 +484,22 @@
 /* Error styling */
 .hana-error {
   color: var(--hana-error-color) !important;
-  padding: 10px !important;
-  border-radius: 5px !important;
+  padding: 12px 15px !important;
+  border-radius: 8px !important;
   background: var(--hana-error-bg) !important;
+  border: 1px solid var(--hana-error-color) !important;
+  margin: 10px 0 !important;
+  font-weight: 500 !important;
+  line-height: 1.4 !important;
+  white-space: pre-wrap !important;
+  word-wrap: break-word !important;
+  font-size: 14px !important;
+  box-shadow: 0 2px 8px rgba(217, 48, 37, 0.1) !important;
+}
+
+:host(.dark-mode) .hana-error {
+  border: 1px solid var(--hana-error-color) !important;
+  box-shadow: 0 2px 8px rgba(255, 92, 92, 0.15) !important;
 }
 
 /* Highlight styles */
