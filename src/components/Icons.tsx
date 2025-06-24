@@ -174,4 +174,47 @@ export const DeepSeekIcon: React.FC<IconProps> = ({ className = '', size = 'md' 
     <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
     <circle cx="12" cy="10" r="3"/>
   </svg>
-); 
+);
+
+// Provider-specific icon component
+interface ProviderIconProps {
+  provider: 'mistral' | 'openai' | 'anthropic' | 'deepseek';
+  darkMode: boolean;
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+  className?: string;
+}
+
+export const ProviderIcon: React.FC<ProviderIconProps> = ({ 
+  provider, 
+  darkMode, 
+  size = 'md', 
+  className = '' 
+}) => {
+  const iconSizeStyles = {
+    xs: { width: '12px', height: '12px' },
+    sm: { width: '16px', height: '16px' },
+    md: { width: '20px', height: '20px' },
+    lg: { width: '24px', height: '24px' },
+    xl: { width: '32px', height: '32px' }
+  };
+
+  // Map provider names to icon filenames
+  const iconMap = {
+    mistral: 'icons8-mistral-100',
+    openai: 'icons8-chatgpt-100', 
+    anthropic: 'icons8-anthropic-100',
+    deepseek: 'icons8-deepseek-100'
+  };
+
+  const theme = darkMode ? 'dark theme' : 'light theme';
+  const iconSrc = `/icons/providers/${theme}/${iconMap[provider]}${darkMode ? '-dark' : ''}.svg`;
+
+  return (
+    <img
+      src={iconSrc}
+      alt={`${provider} icon`}
+      style={iconSizeStyles[size]}
+      className={`inline-block ${className}`}
+    />
+  );
+}; 

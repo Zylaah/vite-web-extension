@@ -13,10 +13,7 @@ import {
   KeyboardIcon,
   SpinnerIcon,
   CheckIcon,
-  MistralIcon,
-  OpenAIIcon,
-  AnthropicIcon,
-  DeepSeekIcon
+  ProviderIcon
 } from '../../components/Icons';
 
 const Popup: React.FC = () => {
@@ -111,39 +108,37 @@ const Popup: React.FC = () => {
     browser.runtime.openOptionsPage();
   };
 
-  // Provider info with modern icons
+  // Provider info with provider-specific icons
+  const accentColorClass = darkMode ? 'text-purple-400' : 'text-pink-500';
+  
   const providerInfo = {
     mistral: { 
       name: 'Mistral AI', 
-      icon: <MistralIcon className="text-orange-500" />, 
-      color: 'from-orange-500 to-red-500' 
+      icon: <ProviderIcon provider="mistral" darkMode={darkMode} size="sm" />
     },
     openai: { 
       name: 'OpenAI', 
-      icon: <OpenAIIcon className="text-green-500" />, 
-      color: 'from-green-500 to-emerald-500' 
+      icon: <ProviderIcon provider="openai" darkMode={darkMode} size="sm" />
     },
     anthropic: { 
       name: 'Anthropic', 
-      icon: <AnthropicIcon className="text-purple-500" />, 
-      color: 'from-purple-500 to-indigo-500' 
+      icon: <ProviderIcon provider="anthropic" darkMode={darkMode} size="sm" />
     },
     deepseek: { 
       name: 'DeepSeek', 
-      icon: <DeepSeekIcon className="text-blue-500" />, 
-      color: 'from-blue-500 to-cyan-500' 
+      icon: <ProviderIcon provider="deepseek" darkMode={darkMode} size="sm" />
     }
   };
 
   const qualityInfo: Record<string, { name: string; icon: React.ReactElement; description: string }> = {
     fast: { 
       name: 'Fast', 
-      icon: <LightningIcon className="text-yellow-500" />, 
+      icon: <LightningIcon className={accentColorClass} />, 
       description: 'Optimized for speed' 
     },
     accurate: { 
       name: 'Accurate', 
-      icon: <TargetIcon className="text-green-500" />, 
+      icon: <TargetIcon className={accentColorClass} />, 
       description: 'Optimized for quality' 
     }
   };
@@ -213,13 +208,17 @@ const Popup: React.FC = () => {
             </div>
           </div>
           {/* Provider indicator - compact */}
-          <div className={`mt-2 p-2 rounded-lg bg-gradient-to-r ${providerInfo[settings.selectedProvider].color} bg-opacity-10`}>
+          <div className={`mt-2 p-2 rounded-lg ${
+            darkMode ? 'bg-purple-900/20 border border-purple-500/30' : 'bg-pink-50 border border-pink-200'
+          }`}>
             <div className="flex items-center gap-2 text-xs">
               {providerInfo[settings.selectedProvider].icon}
               <span className={darkMode ? 'text-gray-400' : 'text-gray-500'}>
                 Connected to {providerInfo[settings.selectedProvider].name}
               </span>
-              <div className={`w-1.5 h-1.5 rounded-full bg-gradient-to-r ${providerInfo[settings.selectedProvider].color} ml-auto`}></div>
+              <div className={`w-1.5 h-1.5 rounded-full ml-auto ${
+                darkMode ? 'bg-purple-400' : 'bg-pink-500'
+              }`}></div>
             </div>
           </div>
         </div>
