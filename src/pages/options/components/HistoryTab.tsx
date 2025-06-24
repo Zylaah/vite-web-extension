@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StorageService, ConversationHistory } from '../../../lib/services/storageService';
+import { ExpandIcon, CollapseIcon, CopyIcon, TrashIcon } from '../../../components/Icons';
 
 interface HistoryTabProps {
   // No props needed for now
@@ -265,50 +266,83 @@ export const HistoryTab: React.FC<HistoryTabProps> = () => {
                     onClick={() => toggleExpanded(conversation.id)}
                     title="View conversation"
                     style={{
-                      padding: '8px 12px',
-                      backgroundColor: 'var(--button-primary)',
-                      color: 'white',
+                      padding: '8px',
+                      backgroundColor: 'transparent',
+                      color: '#666666',
                       border: 'none',
-                      borderRadius: '8px',
+                      borderRadius: '6px',
                       cursor: 'pointer',
-                      fontSize: '14px',
-                      fontWeight: '600',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
                       transition: 'all 0.2s ease'
                     }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#f0f0f0';
+                      e.currentTarget.style.color = '#e44b79';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                      e.currentTarget.style.color = '#666666';
+                    }}
                   >
-                    {expandedConversation === conversation.id ? '▼' : '▶'}
+                    {expandedConversation === conversation.id ? (
+                      <CollapseIcon size="sm" />
+                    ) : (
+                      <ExpandIcon size="sm" />
+                    )}
                   </button>
                   <button
                     onClick={() => handleCopyConversation(conversation)}
                     title="Copy conversation"
                     style={{
-                      padding: '8px 12px',
-                      backgroundColor: 'var(--button-secondary)',
-                      color: 'white',
+                      padding: '8px',
+                      backgroundColor: 'transparent',
+                      color: '#666666',
                       border: 'none',
-                      borderRadius: '8px',
+                      borderRadius: '6px',
                       cursor: 'pointer',
-                      fontSize: '14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
                       transition: 'all 0.2s ease'
                     }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#f0f0f0';
+                      e.currentTarget.style.color = '#34a853';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                      e.currentTarget.style.color = '#666666';
+                    }}
                   >
-                    📋
+                    <CopyIcon size="sm" />
                   </button>
                   <button
                     onClick={() => handleDeleteConversation(conversation.id)}
                     title="Delete conversation"
                     style={{
-                      padding: '8px 12px',
-                      backgroundColor: 'var(--error-color)',
-                      color: 'white',
+                      padding: '8px',
+                      backgroundColor: 'transparent',
+                      color: '#666666',
                       border: 'none',
-                      borderRadius: '8px',
+                      borderRadius: '6px',
                       cursor: 'pointer',
-                      fontSize: '14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
                       transition: 'all 0.2s ease'
                     }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#fee';
+                      e.currentTarget.style.color = '#d93025';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                      e.currentTarget.style.color = '#666666';
+                    }}
                   >
-                    🗑️
+                    <TrashIcon size="sm" />
                   </button>
                 </div>
               </div>

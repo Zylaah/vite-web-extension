@@ -2,6 +2,22 @@ import React, { useEffect, useState } from 'react';
 import browser from 'webextension-polyfill';
 import { StorageService, type SettingsData } from '../../lib/services/storageService';
 import type { AIProvider } from '../../lib/types';
+import { 
+  HanaLogo, 
+  ChevronDownIcon, 
+  SettingsIcon, 
+  RobotIcon, 
+  CogIcon, 
+  LightningIcon, 
+  TargetIcon,
+  KeyboardIcon,
+  SpinnerIcon,
+  CheckIcon,
+  MistralIcon,
+  OpenAIIcon,
+  AnthropicIcon,
+  DeepSeekIcon
+} from '../../components/Icons';
 
 const Popup: React.FC = () => {
   const [settings, setSettings] = useState<SettingsData>({
@@ -95,17 +111,41 @@ const Popup: React.FC = () => {
     browser.runtime.openOptionsPage();
   };
 
-  // Provider info
+  // Provider info with modern icons
   const providerInfo = {
-    mistral: { name: 'Mistral AI', icon: '🚀', color: 'from-orange-500 to-red-500' },
-    openai: { name: 'OpenAI', icon: '🤖', color: 'from-green-500 to-emerald-500' },
-    anthropic: { name: 'Anthropic', icon: '🧠', color: 'from-purple-500 to-indigo-500' },
-    deepseek: { name: 'DeepSeek', icon: '🔍', color: 'from-blue-500 to-cyan-500' }
+    mistral: { 
+      name: 'Mistral AI', 
+      icon: <MistralIcon className="text-orange-500" />, 
+      color: 'from-orange-500 to-red-500' 
+    },
+    openai: { 
+      name: 'OpenAI', 
+      icon: <OpenAIIcon className="text-green-500" />, 
+      color: 'from-green-500 to-emerald-500' 
+    },
+    anthropic: { 
+      name: 'Anthropic', 
+      icon: <AnthropicIcon className="text-purple-500" />, 
+      color: 'from-purple-500 to-indigo-500' 
+    },
+    deepseek: { 
+      name: 'DeepSeek', 
+      icon: <DeepSeekIcon className="text-blue-500" />, 
+      color: 'from-blue-500 to-cyan-500' 
+    }
   };
 
-  const qualityInfo = {
-    fast: { name: 'Fast', icon: '⚡', description: 'Optimized for speed' },
-    accurate: { name: 'Accurate', icon: '🎯', description: 'Optimized for quality' }
+  const qualityInfo: Record<string, { name: string; icon: React.ReactElement; description: string }> = {
+    fast: { 
+      name: 'Fast', 
+      icon: <LightningIcon className="text-yellow-500" />, 
+      description: 'Optimized for speed' 
+    },
+    accurate: { 
+      name: 'Accurate', 
+      icon: <TargetIcon className="text-green-500" />, 
+      description: 'Optimized for quality' 
+    }
   };
 
   if (loading) {
@@ -114,9 +154,7 @@ const Popup: React.FC = () => {
         darkMode ? 'bg-gray-900 text-gray-100' : 'bg-white text-gray-900'
       }`}>
         <div className="flex flex-col items-center gap-3">
-          <div className={`w-8 h-8 border-3 border-t-transparent rounded-full animate-spin ${
-            darkMode ? 'border-purple-400' : 'border-pink-500'
-          }`}></div>
+          <SpinnerIcon className={`${darkMode ? 'text-purple-400' : 'text-pink-500'}`} size="xl" />
           <span className="text-sm font-medium">Loading settings...</span>
         </div>
       </div>
@@ -124,21 +162,17 @@ const Popup: React.FC = () => {
   }
 
   return (
-    <div className={`w-80 min-h-96 ${
+    <div className={`w-80 h-96 flex flex-col ${
       darkMode 
         ? 'bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-gray-100' 
         : 'bg-gradient-to-br from-white via-gray-50 to-white text-gray-900'
     }`}>
       {/* Header */}
-      <div className={`px-6 py-4 border-b ${
+      <div className={`px-4 py-3 border-b ${
         darkMode ? 'border-gray-700 bg-gray-800/50' : 'border-gray-200 bg-white/50'
       } backdrop-blur-sm`}>
         <div className="flex items-center gap-3">
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center bg-gradient-to-br ${
-            darkMode ? 'from-purple-600 to-pink-600' : 'from-pink-500 to-purple-600'
-          } shadow-lg`}>
-            <span className="text-xl">✨</span>
-          </div>
+          <HanaLogo size="lg" />
           <div>
             <h1 className="text-lg font-bold">Hana</h1>
             <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
@@ -149,20 +183,20 @@ const Popup: React.FC = () => {
       </div>
       
       {/* Content */}
-      <div className="p-6 space-y-6">
+      <div className="flex-1 p-4 space-y-4 overflow-y-auto">
         {/* AI Provider Section */}
         <div>
           <label className="block text-sm font-semibold mb-3 flex items-center gap-2">
-            <span>🤖</span>
+            <RobotIcon />
             AI Provider
           </label>
-          <div className={`relative rounded-xl border ${
+          <div className={`relative rounded-lg border ${
             darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'
           } shadow-sm`}>
             <select 
               value={settings.selectedProvider} 
               onChange={handleProviderChange}
-              className={`w-full p-4 rounded-xl appearance-none cursor-pointer font-medium ${
+              className={`w-full p-3 pr-10 rounded-lg appearance-none cursor-pointer font-medium text-sm ${
                 darkMode 
                   ? 'bg-gray-800 text-gray-100 focus:ring-2 focus:ring-purple-500' 
                   : 'bg-white text-gray-900 focus:ring-2 focus:ring-pink-500'
@@ -170,23 +204,22 @@ const Popup: React.FC = () => {
             >
               {Object.entries(providerInfo).map(([key, info]) => (
                 <option key={key} value={key}>
-                  {info.icon} {info.name}
+                  {info.name}
                 </option>
               ))}
             </select>
-            <div className="absolute right-4 top-1/2 transform -translate-y-1/2 pointer-events-none">
-              <svg className={`w-5 h-5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
+            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+              <ChevronDownIcon className={darkMode ? 'text-gray-400' : 'text-gray-500'} />
             </div>
           </div>
-          {/* Provider indicator */}
+          {/* Provider indicator - compact */}
           <div className={`mt-2 p-2 rounded-lg bg-gradient-to-r ${providerInfo[settings.selectedProvider].color} bg-opacity-10`}>
             <div className="flex items-center gap-2 text-xs">
-              <div className={`w-2 h-2 rounded-full bg-gradient-to-r ${providerInfo[settings.selectedProvider].color}`}></div>
-              <span className={darkMode ? 'text-gray-300' : 'text-gray-600'}>
+              {providerInfo[settings.selectedProvider].icon}
+              <span className={darkMode ? 'text-gray-400' : 'text-gray-500'}>
                 Connected to {providerInfo[settings.selectedProvider].name}
               </span>
+              <div className={`w-1.5 h-1.5 rounded-full bg-gradient-to-r ${providerInfo[settings.selectedProvider].color} ml-auto`}></div>
             </div>
           </div>
         </div>
@@ -194,16 +227,16 @@ const Popup: React.FC = () => {
         {/* Quality Preference Section */}
         <div>
           <label className="block text-sm font-semibold mb-3 flex items-center gap-2">
-            <span>⚙️</span>
+            <CogIcon />
             Response Quality
           </label>
-          <div className={`relative rounded-xl border ${
+          <div className={`relative rounded-lg border ${
             darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'
           } shadow-sm`}>
             <select 
               value={settings.qualityPreference} 
               onChange={handleQualityChange}
-              className={`w-full p-4 rounded-xl appearance-none cursor-pointer font-medium ${
+              className={`w-full p-3 pr-10 rounded-lg appearance-none cursor-pointer font-medium text-sm ${
                 darkMode 
                   ? 'bg-gray-800 text-gray-100 focus:ring-2 focus:ring-purple-500' 
                   : 'bg-white text-gray-900 focus:ring-2 focus:ring-pink-500'
@@ -211,42 +244,48 @@ const Popup: React.FC = () => {
             >
               {Object.entries(qualityInfo).map(([key, info]) => (
                 <option key={key} value={key}>
-                  {info.icon} {info.name} - {info.description}
+                  {info.name}
                 </option>
               ))}
             </select>
-            <div className="absolute right-4 top-1/2 transform -translate-y-1/2 pointer-events-none">
-              <svg className={`w-5 h-5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
+            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+              <ChevronDownIcon className={darkMode ? 'text-gray-400' : 'text-gray-500'} />
+            </div>
+          </div>
+          {/* Quality indicator - compact */}
+          <div className={`mt-2 p-2 rounded-lg ${
+            darkMode ? 'bg-gray-800/50' : 'bg-gray-50'
+          }`}>
+            <div className="flex items-center gap-2 text-xs">
+              {qualityInfo[settings.qualityPreference].icon}
+              <span className={darkMode ? 'text-gray-400' : 'text-gray-500'}>
+                {qualityInfo[settings.qualityPreference].description}
+              </span>
             </div>
           </div>
         </div>
 
-        {/* Quick Actions */}
+        {/* Quick Actions - compact */}
         <div>
-          <label className="block text-sm font-semibold mb-3 flex items-center gap-2">
-            <span>⚡</span>
+          <label className="block text-sm font-semibold mb-2 flex items-center gap-2">
+            <KeyboardIcon />
             Quick Actions
           </label>
-          <div className="space-y-3">
-            {/* Keyboard shortcuts info */}
-            <div className={`p-4 rounded-xl ${
-              darkMode ? 'bg-gray-800 border border-gray-700' : 'bg-gray-50 border border-gray-200'
-            }`}>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Toggle Chat</span>
-                  <kbd className={`px-2 py-1 text-xs rounded ${
-                    darkMode ? 'bg-gray-700 text-gray-300' : 'bg-white text-gray-600 shadow-sm'
-                  } font-mono`}>Alt + F</kbd>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Quick Summary</span>
-                  <kbd className={`px-2 py-1 text-xs rounded ${
-                    darkMode ? 'bg-gray-700 text-gray-300' : 'bg-white text-gray-600 shadow-sm'
-                  } font-mono`}>Ctrl + Alt + F</kbd>
-                </div>
+          <div className={`p-3 rounded-lg ${
+            darkMode ? 'bg-gray-800/50' : 'bg-gray-50'
+          }`}>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium">Toggle Chat</span>
+                <kbd className={`px-1.5 py-0.5 text-xs rounded ${
+                  darkMode ? 'bg-gray-700 text-gray-300' : 'bg-white text-gray-600 shadow-sm'
+                } font-mono`}>Alt + F</kbd>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium">Quick Summary</span>
+                <kbd className={`px-1.5 py-0.5 text-xs rounded ${
+                  darkMode ? 'bg-gray-700 text-gray-300' : 'bg-white text-gray-600 shadow-sm'
+                } font-mono`}>Ctrl + Alt + F</kbd>
               </div>
             </div>
           </div>
@@ -254,7 +293,7 @@ const Popup: React.FC = () => {
       </div>
       
       {/* Footer */}
-      <div className={`px-6 py-4 border-t ${
+      <div className={`px-4 py-3 border-t ${
         darkMode ? 'border-gray-700 bg-gray-800/50' : 'border-gray-200 bg-gray-50/50'
       } backdrop-blur-sm`}>
         <div className="flex items-center justify-between">
@@ -266,7 +305,7 @@ const Popup: React.FC = () => {
                 : 'bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white shadow-lg hover:shadow-pink-500/25'
             } hover:scale-105`}
           >
-            <span>⚙️</span>
+            <SettingsIcon size="sm" />
             Options
           </button>
           
@@ -288,7 +327,7 @@ const Popup: React.FC = () => {
               : 'bg-white/90 text-gray-900 border-gray-200'
           }`}>
             <div className="flex items-center gap-2">
-              <span className="text-green-500">✅</span>
+              <CheckIcon className="text-green-500" size="sm" />
               {message}
             </div>
           </div>
