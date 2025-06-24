@@ -15,15 +15,22 @@ export const OptionsHeader: React.FC<OptionsHeaderProps> = ({ darkMode, onDarkMo
       marginBottom: '48px',
       padding: '0 8px'
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-        <HanaLogo size="xl" showText={false} />
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '20px' }}>
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center',
+          paddingTop: '12px' // Align logo with the center of the "Hana" text
+        }}>
+          <HanaLogo size="xl" showText={false} />
+        </div>
         <div>
           <h1 style={{ 
             fontSize: '48px', 
             fontWeight: '700',
             margin: '0',
             color: 'var(--text-color)',
-            letterSpacing: '-0.02em'
+            letterSpacing: '-0.02em',
+            lineHeight: '1.1'
           }}>
             Hana
           </h1>
