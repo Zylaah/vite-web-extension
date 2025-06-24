@@ -19,6 +19,21 @@ export interface SettingsData {
 }
 
 /**
+ * Interface for conversation history
+ */
+export interface ConversationHistory {
+  id: string;
+  url: string;
+  title: string;
+  date: number;
+  messages: Array<{
+    type: 'user' | 'assistant';
+    content: string;
+    timestamp: number;
+  }>;
+}
+
+/**
  * Service for managing extension storage
  */
 export const StorageService = {
@@ -135,6 +150,84 @@ export const StorageService = {
       await browser.storage.local.clear();
     } catch (error) {
       console.error('Error clearing storage:', error);
+      throw error;
+    }
+  },
+
+  // Conversation History Management
+
+  /**
+   * Saves a conversation to history
+   * @param conversation - Conversation data without id and date
+   * @returns Promise with the conversation ID
+   */
+  async saveConversationHistory(conversation: Omit<ConversationHistory, 'id' | 'date'>): Promise<string> {
+    try {
+      const id = `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const newConversation: ConversationHistory = {
+        ...conversation,
+        id,
+        date: Date.now()
+      };
+      
+      // Get existing conversations
+      const result = await browser.storage.local.get('conversationHistory') as { conversationHistory?: ConversationHistory[] };
+      const conversationHistory = result.conversationHistory || [];
+      
+      // Add new conversation
+      const updatedConversations = [...conversationHistory, newConversation];
+      
+      // Save to storage
+      await browser.storage.local.set({ conversationHistory: updatedConversations });
+      
+      return id;
+    } catch (error) {
+      console.error('Error saving conversation history:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Gets all conversation history
+   * @returns Promise with array of conversations
+   */
+  async getConversationHistory(): Promise<ConversationHistory[]> {
+    try {
+      const result = await browser.storage.local.get('conversationHistory') as { conversationHistory?: ConversationHistory[] };
+      const conversationHistory = result.conversationHistory || [];
+      return conversationHistory.sort((a: ConversationHistory, b: ConversationHistory) => b.date - a.date);
+    } catch (error) {
+      console.error('Error getting conversation history:', error);
+      return [];
+    }
+  },
+
+  /**
+   * Deletes a specific conversation from history
+   * @param id - Conversation ID to delete
+   * @returns Promise
+   */
+  async deleteConversationHistory(id: string): Promise<void> {
+    try {
+      const result = await browser.storage.local.get('conversationHistory') as { conversationHistory?: ConversationHistory[] };
+      const conversationHistory = result.conversationHistory || [];
+      const updatedConversations = conversationHistory.filter((conv: ConversationHistory) => conv.id !== id);
+      await browser.storage.local.set({ conversationHistory: updatedConversations });
+    } catch (error) {
+      console.error('Error deleting conversation history:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Deletes all conversation history
+   * @returns Promise
+   */
+  async deleteAllConversationHistory(): Promise<void> {
+    try {
+      await browser.storage.local.set({ conversationHistory: [] });
+    } catch (error) {
+      console.error('Error deleting all conversation history:', error);
       throw error;
     }
   }

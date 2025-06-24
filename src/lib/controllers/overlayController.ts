@@ -83,14 +83,16 @@ export class OverlayController {
 
     try {
       const settings = await StorageService.getSettings();
-      const existingConversation = this.tabManager.getConversation() || null;
+      
+      // Always start with a fresh conversation (no message restoration)
+      console.log('Hana: Starting with fresh conversation (no message restoration)');
 
       console.log('Hana: Creating shadow overlay...');
       // Create shadow DOM container instead of iframe
       this.overlayInstance = await this.createShadowOverlay({
         mode,
         settings,
-        existingConversation: existingConversation as any,
+        existingConversation: null, // Always null to start fresh
       });
 
       this.isOverlayVisible = true;
@@ -115,6 +117,13 @@ export class OverlayController {
     this.isTransitioning = true;
     
     try {
+      // Save conversation to history before closing
+      this.saveCurrentConversationToHistory();
+      
+      // Clear the conversation from session storage so it doesn't restore next time
+      this.tabManager.clearConversation();
+      console.log('Hana: Conversation cleared from session storage');
+      
       // Remove the shadow DOM container even if isOverlayVisible is false
       if (this.overlayInstance) {
         console.log('Hana: Removing overlay instance');
@@ -141,6 +150,50 @@ export class OverlayController {
       setTimeout(() => {
         this.isTransitioning = false;
       }, 150);
+    }
+  }
+
+  /**
+   * Saves the current conversation to history
+   */
+  private async saveCurrentConversationToHistory(): Promise<void> {
+    try {
+      const currentConversation = this.tabManager.getConversation();
+      
+      // Only save if there are messages in the conversation
+      if (!currentConversation || !currentConversation.messages || currentConversation.messages.length === 0) {
+        console.log('Hana: No conversation to save to history');
+        return;
+      }
+
+      // Generate title from first user message or use default
+      let title = 'Untitled Conversation';
+      const firstUserMessage = currentConversation.messages.find(msg => msg.role === 'user');
+      if (firstUserMessage && firstUserMessage.content) {
+        // Use first 50 characters of the first user message as title
+        title = firstUserMessage.content.substring(0, 50).trim();
+        if (firstUserMessage.content.length > 50) {
+          title += '...';
+        }
+      }
+
+      // Convert messages to history format
+      const historyMessages = currentConversation.messages.map(msg => ({
+        type: msg.role as 'user' | 'assistant',
+        content: msg.content,
+        timestamp: msg.timestamp || Date.now()
+      }));
+
+      // Save to storage
+      await StorageService.saveConversationHistory({
+        url: window.location.href,
+        title,
+        messages: historyMessages
+      });
+
+      console.log('Hana: Conversation saved to history:', title);
+    } catch (error) {
+      console.error('Hana: Error saving conversation to history:', error);
     }
   }
 
